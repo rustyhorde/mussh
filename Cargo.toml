@@ -1,0 +1,27 @@
+[package]
+authors = ["Jason Ozias <jason.g.ozias@gmail.com>"]
+description = "SSH Multiplexing"
+documentation = "http://rustyhorde.github.io/mussh"
+homepage = "http://rustyhorde.github.io/mussh"
+keywords = ["mussh", "ssh"]
+license = "MIT/Apache-2.0"
+name = "mussh"
+readme = "README.md"
+repository = "https://github.com/rustyhorde/mussh"
+version = "0.1.0"
+
+[dependencies]
+clap = "2.10.3"
+lazy_static = "0.2.1"
+slog = "1.0.0-alpha"
+slog-json = "1.0.0-alpha"
+slog-term = "1.0.0-alpha"
+ssh2 = "0.2.13"
+toml = "0.2.0"
+
+[dependencies.clippy]
+optional = true
+version = "0.0.85"
+
+[features]
+lint = ["clippy"]
