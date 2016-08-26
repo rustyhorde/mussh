@@ -1,0 +1,53 @@
+[hostlist.all]
+hostnames = ["m1", "m2", "m3", "m5", "m6", "tools", "localhost"]
+
+[hostlist.most]
+hostnames = ["m1", "m2", "m3", "m5", "m6", "localhost"]
+
+[hostlist.local]
+hostnames = ["localhost"]
+
+[hosts.localhost]
+hostname = "localhost"
+
+[hosts.m1]
+hostname = "jasonozias.com"
+port = 22
+
+[hosts.m2]
+hostname = "localhost"
+port = 2220
+
+[hosts.m3]
+hostname = "localhost"
+port = 2221
+
+[hosts.m5]
+hostname = "localhost"
+port = 3222
+
+[hosts.m6]
+hostname = "localhost"
+port = 2223
+
+[hosts.tools]
+hostname = "patlv2tools01.int.distco.com"
+
+[cmd.ls]
+command = "ls -al"
+
+[cmd.mrup]
+command = "mrup -l"
+
+[cmd.updall]
+command = "updall -l"
+
+[cmd.uname]
+command = "uname -a"
+
+[cmd.python]
+command = "rub python"
+
+[cmd.atom]
+command = """cdp atom; and git pull; and script/build; \
+           and sudo script/grunt install"""

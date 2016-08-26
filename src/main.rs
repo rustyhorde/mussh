@@ -11,6 +11,8 @@
 #![cfg_attr(feature="clippy", plugin(clippy))]
 #![cfg_attr(feature="clippy", deny(clippy))]
 #![deny(missing_docs)]
+#![feature(question_mark)]
+
 #[macro_use]
 extern crate clap;
 #[macro_use]
@@ -18,6 +20,7 @@ extern crate lazy_static;
 #[macro_use]
 extern crate slog;
 
+extern crate rustc_serialize;
 extern crate ssh2;
 extern crate slog_json;
 extern crate slog_term;
@@ -57,4 +60,21 @@ pub type MusshResult<T> = Result<T, MusshErr>;
 
 fn main() {
     process::exit(run::run(None));
+}
+
+#[cfg(test)]
+mod main_test {
+    use super::run;
+
+    #[test]
+    fn command_line() {
+        assert!(0 == run::run(Some(vec!["mussh", "-vvvv", "--dryrun", "local", "python"])));
+        assert!(0 ==
+                run::run(Some(vec!["mussh",
+                                   "--dryrun",
+                                   "-c",
+                                   "test_cfg/mussh.toml",
+                                   "all",
+                                   "python"])))
+    }
 }
