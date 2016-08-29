@@ -44,7 +44,7 @@ lazy_static! {
     /// stdout Drain switch
     pub static ref STDOUT_SW: AtomicSwitchCtrl = AtomicSwitchCtrl::new(
         level_filter(
-            Level::Error,
+            Level::Info,
             async_stream(io::stdout(), slog_term::format_colored())
         )
     );

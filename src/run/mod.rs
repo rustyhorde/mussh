@@ -9,6 +9,7 @@ use ssh2::Session;
 use std::fs::OpenOptions;
 use std::io::{self, BufRead, BufReader};
 use std::net::{TcpStream, ToSocketAddrs};
+use std::path::Path;
 use std::process::{Command, Stdio};
 use std::thread;
 
@@ -60,12 +61,20 @@ fn setup_command(config: &MusshToml, matches: &ArgMatches) -> MusshResult<String
     }
 }
 
-fn setup_host(config: &MusshToml, hostname: &str) -> MusshResult<(String, u16)> {
+fn setup_host(config: &MusshToml,
+              hostname: &str)
+              -> MusshResult<(String, String, u16, Option<String>)> {
     if let Some(hosts) = config.hosts() {
         if let Some(host) = hosts.get(hostname) {
+            let username = host.username();
             let hn = host.hostname();
+            let pem = if let Some(pem) = host.pem() {
+                Some(pem.clone())
+            } else {
+                None
+            };
             let port = host.port().unwrap_or(22);
-            Ok((hn.clone(), port))
+            Ok((username.clone(), hn.clone(), port, pem))
         } else {
             // TODO: fix this error
             Err(MusshErr::Unknown)
@@ -76,37 +85,46 @@ fn setup_host(config: &MusshToml, hostname: &str) -> MusshResult<(String, u16)> 
     }
 }
 
-fn execute<A: ToSocketAddrs>(hostname: String, command: String, host: A) -> MusshResult<()> {
+fn execute<A: ToSocketAddrs>(hostname: String,
+                             command: String,
+                             username: String,
+                             pem: Option<String>,
+                             host: A)
+                             -> MusshResult<()> {
     let stdout = Logger::root(STDOUT_SW.drain(), o!());
+    let stderr = Logger::root(STDERR_SW.drain(), o!());
+    let mut filename = hostname.clone();
+    filename.push_str(".log");
+    let outfile = OpenOptions::new().create(true).append(true).open(&filename)?;
+    let file_async = level_filter(Level::Trace,
+                                  async_stream(outfile, slog_term::format_plain()));
+    let file_logger = Logger::root(file_async, o!());
+
     if &hostname == "localhost" {
         let mut cmd = Command::new("/usr/bin/fish");
         cmd.arg("-c");
         cmd.arg(command);
         cmd.stdout(Stdio::piped());
-        cmd.stderr(Stdio::piped());
 
         if let Ok(mut child) = cmd.spawn() {
             let stdout_reader = BufReader::new(child.stdout.take().expect(""));
-            let stderr_reader = BufReader::new(child.stderr.take().expect(""));
-            let blah = stdout.clone();
             let hn = hostname.clone();
-            let stdout_child = thread::spawn(move || {
-                for line in stdout_reader.lines() {
-                    trace!(blah, "execute", "hostname" => hn, "line" => line.expect(""));
-                }
-            });
+            for line in stdout_reader.lines() {
+                trace!(file_logger, "execute", "hostname" => hn, "line" => line.expect(""));
+            }
 
-            let blah1 = stdout.clone();
-            let hn1 = hostname.clone();
-            let stderr_child = thread::spawn(move || {
-                for line in stderr_reader.lines() {
-                    trace!(blah1, "execute", "hostname" => hn1, "line" => line.expect(""));
+            match child.wait() {
+                Ok(status) => {
+                    if let Some(code) = status.code() {
+                        info!(stdout, "execute", "hostname" => hn, "code" => code);
+                    } else {
+                        error!(stderr, "execute", "hostname" => hn, "error" => "No exit code");
+                    }
                 }
-            });
-
-            let _ = stdout_child.join();
-            let _ = stderr_child.join();
-            child.wait().expect("command wasn't running");
+                Err(e) => {
+                    error!(stderr, "execute", "hostname" => hn, "error" => format!("{}", e));
+                }
+            }
         }
         Ok(())
     } else {
@@ -114,14 +132,37 @@ fn execute<A: ToSocketAddrs>(hostname: String, command: String, host: A) -> Muss
             trace!(stdout, "execute", "message" => "Session established");
             let tcp = TcpStream::connect(host)?;
             sess.handshake(&tcp)?;
-            sess.userauth_agent("jozias")?;
+            if let Some(pem) = pem {
+                sess.userauth_pubkey_file(&username, None, Path::new(&pem), None)?;
+            } else {
+                sess.userauth_agent(&username)?;
+            }
 
             if sess.authenticated() {
                 let mut channel = sess.channel_session()?;
                 channel.exec(&command)?;
-                let reader = BufReader::new(channel);
-                for line in reader.lines() {
-                    trace!(stdout, "execute", "hostname" => hostname, "line" => line.expect(""));
+                let hn = hostname.clone();
+
+                {
+                    let stdout_stream = channel.stream(0);
+                    let stdout_reader = BufReader::new(stdout_stream);
+
+                    for line in stdout_reader.lines() {
+                        trace!(file_logger, "execute", "hostname" => hn, "line" => line.expect(""));
+                    }
+                }
+
+                match channel.exit_status() {
+                    Ok(code) => {
+                        if code == 0 {
+                            info!(stdout, "execute", "hostname" => hn, "code" => code);
+                        } else {
+                            error!(stderr, "execute", "hostname" => hn, "code" => code);
+                        }
+                    }
+                    Err(e) => {
+                        error!(stderr, "execute", "hostname" => hn, "error" => format!("{}", e));
+                    }
                 }
             } else {
                 return Err(MusshErr::Auth);
@@ -141,8 +182,10 @@ fn multiplex(config: MusshToml, matches: ArgMatches) -> MusshResult<()> {
     for hostname in hostnames.into_iter() {
         let t_hostname = hostname.clone();
         let t_cmd = cmd.clone();
-        let (hn, port) = setup_host(&config, &t_hostname)?;
-        children.push(thread::spawn(move || execute(t_hostname, t_cmd, (&hn[..], port))));
+        let (username, hn, port, pem) = setup_host(&config, &t_hostname)?;
+        children.push(thread::spawn(move || {
+            execute(t_hostname, t_cmd, username, pem, (&hn[..], port))
+        }));
     }
 
     let mut errors = Vec::new();
@@ -203,11 +246,9 @@ pub fn run(opt_args: Option<Vec<&str>>) -> i32 {
 
     // Setup the logging
     let level = match matches.occurrences_of("verbose") {
-        0 => Level::Error,
-        1 => Level::Warning,
-        2 => Level::Info,
-        3 => Level::Debug,
-        4 | _ => Level::Trace,
+        0 => Level::Info,
+        1 => Level::Debug,
+        2 | _ => Level::Trace,
     };
 
     let mut stdout_json_drain = None;

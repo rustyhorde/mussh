@@ -26,7 +26,9 @@ pub struct Hosts {
 #[derive(Debug, Default, RustcDecodable)]
 pub struct Host {
     hostname: String,
+    pem: Option<String>,
     port: Option<u16>,
+    username: String,
 }
 
 #[derive(Debug, Default, RustcDecodable)]
@@ -91,6 +93,17 @@ impl Host {
 
     pub fn port(&self) -> Option<u16> {
         self.port
+    }
+
+    pub fn username(&self) -> &String {
+        &self.username
+    }
+
+    pub fn pem(&self) -> Option<&String> {
+        match self.pem {
+            Some(ref p) => Some(p),
+            None => None,
+        }
     }
 }
 
