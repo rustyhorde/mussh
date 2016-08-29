@@ -2,8 +2,7 @@ use {MusshResult, STDERR_SW, STDOUT_SW};
 use clap::{App, Arg, ArgMatches};
 use config::MusshToml;
 use error::MusshErr;
-use slog::Level;
-use slog::drain::{self, IntoLogger};
+use slog::{Level, Logger, async_stream, duplicate, level_filter, stream};
 use slog_json;
 use slog_term;
 use ssh2::Session;
@@ -14,14 +13,14 @@ use std::process::{Command, Stdio};
 use std::thread;
 
 fn setup_hostnames(config: &MusshToml, matches: &ArgMatches) -> MusshResult<Vec<String>> {
-    let stdout = STDOUT_SW.drain().into_logger(o!());
+    let stdout = Logger::root(STDOUT_SW.drain(), o!());
     let mut hostnames = Vec::new();
     if let Some(hosts_arg) = matches.value_of("hosts") {
         if let Some(hosts) = config.hostlist() {
             for (name, host_config) in hosts {
                 if name == hosts_arg {
                     hostnames = host_config.hostnames().clone();
-                    trace!(stdout, "multiplex", "hostnames" => format!("{:?}", hostnames));
+                    trace!(stdout, "setup_hostnames", "hostnames" => format!("{:?}", hostnames));
                     break;
                 }
             }
@@ -38,14 +37,14 @@ fn setup_hostnames(config: &MusshToml, matches: &ArgMatches) -> MusshResult<Vec<
 }
 
 fn setup_command(config: &MusshToml, matches: &ArgMatches) -> MusshResult<String> {
-    let stdout = STDOUT_SW.drain().into_logger(o!());
+    let stdout = Logger::root(STDOUT_SW.drain(), o!());
     let mut cmd = String::new();
     if let Some(cmd_arg) = matches.value_of("command") {
         if let Some(cmds) = config.cmd() {
             for (name, command) in cmds {
                 if name == cmd_arg {
                     cmd = command.command().clone();
-                    trace!(stdout, "multiplex", "command" => cmd);
+                    trace!(stdout, "setup_command", "command" => cmd);
                     break;
                 }
             }
@@ -78,39 +77,36 @@ fn setup_host(config: &MusshToml, hostname: &str) -> MusshResult<(String, u16)> 
 }
 
 fn execute<A: ToSocketAddrs>(hostname: String, command: String, host: A) -> MusshResult<()> {
-    let stdout = STDOUT_SW.drain().into_logger(o!());
+    let stdout = Logger::root(STDOUT_SW.drain(), o!());
     if &hostname == "localhost" {
-        let mut cmd_iter = command.split_whitespace();
-        if let Some(cmd) = cmd_iter.next() {
-            let args: Vec<&str> = cmd_iter.collect();
-            let mut cmd = Command::new(cmd);
-            cmd.args(&args);
-            cmd.stdout(Stdio::piped());
-            cmd.stderr(Stdio::piped());
+        let mut cmd = Command::new("/usr/bin/fish");
+        cmd.arg("-c");
+        cmd.arg(command);
+        cmd.stdout(Stdio::piped());
+        cmd.stderr(Stdio::piped());
 
-            if let Ok(mut child) = cmd.spawn() {
-                let stdout_reader = BufReader::new(child.stdout.take().expect(""));
-                let stderr_reader = BufReader::new(child.stderr.take().expect(""));
-                let blah = stdout.clone();
-                let hn = hostname.clone();
-                let stdout_child = thread::spawn(move || {
-                    for line in stdout_reader.lines() {
-                        trace!(blah, "execute", "hostname" => hn, "line" => line.expect(""));
-                    }
-                });
+        if let Ok(mut child) = cmd.spawn() {
+            let stdout_reader = BufReader::new(child.stdout.take().expect(""));
+            let stderr_reader = BufReader::new(child.stderr.take().expect(""));
+            let blah = stdout.clone();
+            let hn = hostname.clone();
+            let stdout_child = thread::spawn(move || {
+                for line in stdout_reader.lines() {
+                    trace!(blah, "execute", "hostname" => hn, "line" => line.expect(""));
+                }
+            });
 
-                let blah1 = stdout.clone();
-                let hn1 = hostname.clone();
-                let stderr_child = thread::spawn(move || {
-                    for line in stderr_reader.lines() {
-                        trace!(blah1, "execute", "hostname" => hn1, "line" => line.expect(""));
-                    }
-                });
+            let blah1 = stdout.clone();
+            let hn1 = hostname.clone();
+            let stderr_child = thread::spawn(move || {
+                for line in stderr_reader.lines() {
+                    trace!(blah1, "execute", "hostname" => hn1, "line" => line.expect(""));
+                }
+            });
 
-                let _ = stdout_child.join();
-                let _ = stderr_child.join();
-                child.wait().expect("command wasn't running");
-            }
+            let _ = stdout_child.join();
+            let _ = stderr_child.join();
+            child.wait().expect("command wasn't running");
         }
         Ok(())
     } else {
@@ -217,39 +213,39 @@ pub fn run(opt_args: Option<Vec<&str>>) -> i32 {
     let mut stdout_json_drain = None;
     if let Some(json_path) = matches.value_of("json") {
         if let Ok(json_file) = OpenOptions::new().create(true).append(true).open(json_path) {
-            stdout_json_drain = Some(drain::stream(json_file, slog_json::new()));
+            stdout_json_drain = Some(stream(json_file, slog_json::new()));
         }
     }
 
-    let stdout_base = drain::async_stream(io::stdout(), slog_term::format_colored());
+    let stdout_base = async_stream(io::stdout(), slog_term::format_colored());
 
     if let Some(json) = stdout_json_drain {
-        STDOUT_SW.set(drain::filter_level(level, drain::duplicate(stdout_base, json)));
+        STDOUT_SW.set(level_filter(level, duplicate(stdout_base, json)));
     } else {
-        STDOUT_SW.set(drain::filter_level(level, stdout_base));
+        STDOUT_SW.set(level_filter(level, stdout_base));
     }
 
     let mut stderr_json_drain = None;
     if let Some(json_path) = matches.value_of("json") {
         if let Ok(json_file) = OpenOptions::new().create(true).append(true).open(json_path) {
-            stderr_json_drain = Some(drain::stream(json_file, slog_json::new()));
+            stderr_json_drain = Some(stream(json_file, slog_json::new()));
         }
     }
 
-    let stderr_base = drain::async_stream(io::stderr(), slog_term::format_colored());
+    let stderr_base = async_stream(io::stderr(), slog_term::format_colored());
 
     if let Some(json) = stderr_json_drain {
-        STDERR_SW.set(drain::filter_level(level, drain::duplicate(stderr_base, json)));
+        STDERR_SW.set(level_filter(level, duplicate(stderr_base, json)));
     } else {
-        STDERR_SW.set(drain::filter_level(level, stderr_base));
+        STDERR_SW.set(level_filter(level, stderr_base));
     }
 
     if matches.is_present("dry_run") {
-        let stdout = STDOUT_SW.drain().into_logger(o!());
+        let stdout = Logger::root(STDOUT_SW.drain(), o!());
         warn!(stdout, "run", "message" => "Not starting multiplex!", "dryrun" => "true");
         0
     } else if let Err(e) = multiplex(MusshToml::new(&matches), matches) {
-        let stderr = STDERR_SW.drain().into_logger(o!());
+        let stderr = Logger::root(STDERR_SW.drain(), o!());
         error!(stderr, "run", "error" => "error running multiplex", "detail" => format!("{}", e));
         1
     } else {

@@ -27,8 +27,7 @@ extern crate slog_term;
 extern crate toml;
 
 use error::MusshErr;
-use slog::Level;
-use slog::drain::{self, AtomicSwitchCtrl};
+use slog::{AtomicSwitchCtrl, Level, async_stream, level_filter};
 use std::io;
 use std::process;
 
@@ -44,14 +43,14 @@ pub const PKG: Option<&'static str> = option_env!("CARGO_PKG_NAME");
 lazy_static! {
     /// stdout Drain switch
     pub static ref STDOUT_SW: AtomicSwitchCtrl = AtomicSwitchCtrl::new(
-        drain::filter_level(
+        level_filter(
             Level::Error,
-            drain::async_stream(io::stdout(), slog_term::format_colored())
+            async_stream(io::stdout(), slog_term::format_colored())
         )
     );
     /// stderr Drain switch
     pub static ref STDERR_SW: AtomicSwitchCtrl = AtomicSwitchCtrl::new(
-        drain::async_stream(io::stderr(), slog_term::format_colored())
+        async_stream(io::stderr(), slog_term::format_colored())
     );
 }
 

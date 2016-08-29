@@ -1,6 +1,6 @@
 use STDOUT_SW;
 use clap::ArgMatches;
-use slog::drain::IntoLogger;
+use slog::Logger;
 use std::collections::HashMap;
 use std::env;
 use std::fs::File;
@@ -51,7 +51,7 @@ impl MusshToml {
             }
         }
 
-        let stdout = STDOUT_SW.drain().into_logger(o!());
+        let stdout = Logger::root(STDOUT_SW.drain(), o!());
         trace!(stdout, "MusshToml::new", "toml" => format!("{:?}", toml));
         toml
     }
