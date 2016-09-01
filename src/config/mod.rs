@@ -8,8 +8,10 @@ use std::io::Read;
 use std::path::PathBuf;
 use toml;
 
-const CONFIG_FILE_NAME: &'static str = "mussh.toml";
-const DOT_DIR: &'static str = ".mussh";
+pub const CONFIG_FILE_NAME: &'static str = "mussh.toml";
+pub const DOT_DIR: &'static str = ".mussh";
+pub const STDOUT_FILE: &'static str = "stdout.log";
+pub const STDERR_FILE: &'static str = "stderr.log";
 
 #[derive(Debug, Default, RustcDecodable)]
 pub struct MusshToml {
@@ -29,11 +31,18 @@ pub struct Host {
     pem: Option<String>,
     port: Option<u16>,
     username: String,
+    alias: Vec<Alias>,
 }
 
 #[derive(Debug, Default, RustcDecodable)]
 pub struct Command {
     command: String,
+}
+
+#[derive(Debug, Default, RustcDecodable)]
+pub struct Alias {
+    command: String,
+    aliasfor: String,
 }
 
 impl MusshToml {
@@ -105,11 +114,34 @@ impl Host {
             None => None,
         }
     }
+
+    pub fn alias(&self) -> Option<HashMap<String, String>> {
+        let mut aliases = HashMap::new();
+        for alias in &self.alias {
+            aliases.insert(alias.aliasfor().clone(), alias.command().clone());
+        }
+
+        if aliases.is_empty() {
+            None
+        } else {
+            Some(aliases)
+        }
+    }
 }
 
 impl Command {
     pub fn command(&self) -> &String {
         &self.command
+    }
+}
+
+impl Alias {
+    pub fn command(&self) -> &String {
+        &self.command
+    }
+
+    pub fn aliasfor(&self) -> &String {
+        &self.aliasfor
     }
 }
 

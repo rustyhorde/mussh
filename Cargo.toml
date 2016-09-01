@@ -11,18 +11,17 @@ repository = "https://github.com/rustyhorde/mussh"
 version = "0.1.0"
 
 [dependencies]
-clap = "2.10.3"
-lazy_static = "0.2.1"
-rustc-serialize = "0.3.19"
-slog = "1.0.0-alpha"
-slog-json = "1.0.0-alpha"
-slog-term = "1.0.0-alpha"
-ssh2 = "0.2.13"
-toml = "0.2.0"
+clap = "~2"
+lazy_static = "~0"
+rustc-serialize = "~0"
+slog = "~1.0.0-alpha"
+slog-term = "~1.0.0-alpha"
+ssh2 = "~0"
+toml = "~0"
 
 [dependencies.clippy]
 optional = true
-version = "0.0.85"
+version = "~0"
 
 [features]
 lint = ["clippy"]

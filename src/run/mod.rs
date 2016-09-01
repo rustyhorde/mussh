@@ -1,15 +1,16 @@
 use {MusshResult, STDERR_SW, STDOUT_SW};
 use clap::{App, Arg, ArgMatches};
-use config::MusshToml;
+use config::{DOT_DIR, MusshToml, STDERR_FILE, STDOUT_FILE};
 use error::MusshErr;
 use slog::{Level, Logger, async_stream, duplicate, level_filter, stream};
-use slog_json;
 use slog_term;
 use ssh2::Session;
-use std::fs::OpenOptions;
+use std::collections::HashMap;
+use std::env;
+use std::fs::{self, OpenOptions};
 use std::io::{self, BufRead, BufReader};
 use std::net::{TcpStream, ToSocketAddrs};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::thread;
 
@@ -61,9 +62,9 @@ fn setup_command(config: &MusshToml, matches: &ArgMatches) -> MusshResult<String
     }
 }
 
-fn setup_host(config: &MusshToml,
-              hostname: &str)
-              -> MusshResult<(String, String, u16, Option<String>)> {
+type ConfigTuple = (String, String, u16, Option<String>, Option<HashMap<String, String>>);
+
+fn setup_host(config: &MusshToml, hostname: &str) -> MusshResult<ConfigTuple> {
     if let Some(hosts) = config.hosts() {
         if let Some(host) = hosts.get(hostname) {
             let username = host.username();
@@ -74,7 +75,12 @@ fn setup_host(config: &MusshToml,
                 None
             };
             let port = host.port().unwrap_or(22);
-            Ok((username.clone(), hn.clone(), port, pem))
+            let alias = if let Some(al) = host.alias() {
+                Some(al.clone())
+            } else {
+                None
+            };
+            Ok((username.clone(), hn.clone(), port, pem, alias))
         } else {
             // TODO: fix this error
             Err(MusshErr::Unknown)
@@ -93,9 +99,18 @@ fn execute<A: ToSocketAddrs>(hostname: String,
                              -> MusshResult<()> {
     let stdout = Logger::root(STDOUT_SW.drain(), o!());
     let stderr = Logger::root(STDERR_SW.drain(), o!());
-    let mut filename = hostname.clone();
-    filename.push_str(".log");
-    let outfile = OpenOptions::new().create(true).append(true).open(&filename)?;
+
+    let mut host_file_path = if let Some(mut home_dir) = env::home_dir() {
+        home_dir.push(DOT_DIR);
+        home_dir
+    } else {
+        PathBuf::new()
+    };
+
+    host_file_path.push(hostname.clone());
+    host_file_path.set_extension("log");
+
+    let outfile = OpenOptions::new().create(true).append(true).open(host_file_path)?;
     let file_async = level_filter(Level::Trace,
                                   async_stream(outfile, slog_term::format_plain()));
     let file_logger = Logger::root(file_async, o!());
@@ -181,8 +196,33 @@ fn multiplex(config: MusshToml, matches: ArgMatches) -> MusshResult<()> {
 
     for hostname in hostnames.into_iter() {
         let t_hostname = hostname.clone();
-        let t_cmd = cmd.clone();
-        let (username, hn, port, pem) = setup_host(&config, &t_hostname)?;
+        let (username, hn, port, pem, alias) = setup_host(&config, &t_hostname)?;
+
+        let t_cmd = if let Some(alias_map) = alias {
+            if let Some(cmd_arg) = matches.value_of("command") {
+                if let Some(alias) = alias_map.get(cmd_arg) {
+                    if let Some(cmds) = config.cmd() {
+                        if let Some(alias_cmd) = cmds.get(alias) {
+                            let stdout = Logger::root(STDOUT_SW.drain(), o!());
+                            let a_cmd = alias_cmd.command().clone();
+                            trace!(stdout, "multiplex", "hostname" => t_hostname, "alias" => a_cmd);
+                            a_cmd
+                        } else {
+                            cmd.clone()
+                        }
+                    } else {
+                        cmd.clone()
+                    }
+                } else {
+                    cmd.clone()
+                }
+            } else {
+                cmd.clone()
+            }
+        } else {
+            cmd.clone()
+        };
+
         children.push(thread::spawn(move || {
             execute(t_hostname, t_cmd, username, pem, (&hn[..], port))
         }));
@@ -203,6 +243,48 @@ fn multiplex(config: MusshToml, matches: ArgMatches) -> MusshResult<()> {
     }
 }
 
+fn setup_file_log(matches: &ArgMatches, level: Level, stdout: bool) {
+    let mut file_drain = None;
+    let mut file_path = if let Some(logdir) = matches.value_of("logdir") {
+        PathBuf::from(logdir)
+    } else if let Some(mut home_dir) = env::home_dir() {
+        home_dir.push(DOT_DIR);
+        home_dir
+    } else {
+        PathBuf::new()
+    };
+
+    if stdout {
+        file_path.push(STDOUT_FILE);
+    } else {
+        file_path.push(STDERR_FILE);
+    }
+
+    if let Ok(log_file) = OpenOptions::new().create(true).append(true).open(file_path) {
+        file_drain = Some(stream(log_file, slog_term::format_plain()));
+    }
+
+    let base = if stdout {
+        level_filter(level,
+                     async_stream(io::stdout(), slog_term::format_colored()))
+    } else {
+        level_filter(level,
+                     async_stream(io::stderr(), slog_term::format_colored()))
+    };
+
+    if let Some(file) = file_drain {
+        if stdout {
+            STDOUT_SW.set(duplicate(base, file));
+        } else {
+            STDERR_SW.set(duplicate(base, file));
+        }
+    } else if stdout {
+        STDOUT_SW.set(base);
+    } else {
+        STDERR_SW.set(base);
+    }
+}
+
 pub fn run(opt_args: Option<Vec<&str>>) -> i32 {
     let app = App::new("mussh")
         .version(crate_version!())
@@ -214,6 +296,12 @@ pub fn run(opt_args: Option<Vec<&str>>) -> i32 {
             .value_name("CONFIG")
             .help("Specify a non-standard path for the config file.")
             .takes_value(true))
+        .arg(Arg::with_name("logdir")
+            .short("l")
+            .long("logdir")
+            .value_name("LOGDIR")
+            .help("Specify a non-standard path for the log files.")
+            .takes_value(true))
         .arg(Arg::with_name("dry_run")
             .long("dryrun")
             .help("Parse config and setup the client, but don't run it."))
@@ -221,12 +309,6 @@ pub fn run(opt_args: Option<Vec<&str>>) -> i32 {
             .short("v")
             .multiple(true)
             .help("Set the output verbosity level (more v's = more verbose)"))
-        .arg(Arg::with_name("json")
-            .short("j")
-            .long("json")
-            .help("Enable json logging at the given path")
-            .value_name("PATH")
-            .takes_value(true))
         .arg(Arg::with_name("hosts")
             .value_name("hosts")
             .help("The hosts to multiplex the command over")
@@ -251,35 +333,18 @@ pub fn run(opt_args: Option<Vec<&str>>) -> i32 {
         2 | _ => Level::Trace,
     };
 
-    let mut stdout_json_drain = None;
-    if let Some(json_path) = matches.value_of("json") {
-        if let Ok(json_file) = OpenOptions::new().create(true).append(true).open(json_path) {
-            stdout_json_drain = Some(stream(json_file, slog_json::new()));
+    // Create the dot dir if it doesn't exist.
+    if let Some(mut home_dir) = env::home_dir() {
+        home_dir.push(DOT_DIR);
+        if let Err(_) = fs::metadata(&home_dir) {
+            if let Err(_) = fs::create_dir_all(home_dir) {
+                return 1;
+            }
         }
     }
 
-    let stdout_base = async_stream(io::stdout(), slog_term::format_colored());
-
-    if let Some(json) = stdout_json_drain {
-        STDOUT_SW.set(level_filter(level, duplicate(stdout_base, json)));
-    } else {
-        STDOUT_SW.set(level_filter(level, stdout_base));
-    }
-
-    let mut stderr_json_drain = None;
-    if let Some(json_path) = matches.value_of("json") {
-        if let Ok(json_file) = OpenOptions::new().create(true).append(true).open(json_path) {
-            stderr_json_drain = Some(stream(json_file, slog_json::new()));
-        }
-    }
-
-    let stderr_base = async_stream(io::stderr(), slog_term::format_colored());
-
-    if let Some(json) = stderr_json_drain {
-        STDERR_SW.set(level_filter(level, duplicate(stderr_base, json)));
-    } else {
-        STDERR_SW.set(level_filter(level, stderr_base));
-    }
+    setup_file_log(&matches, level, true);
+    setup_file_log(&matches, level, false);
 
     if matches.is_present("dry_run") {
         let stdout = Logger::root(STDOUT_SW.drain(), o!());

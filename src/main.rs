@@ -22,7 +22,6 @@ extern crate slog;
 
 extern crate rustc_serialize;
 extern crate ssh2;
-extern crate slog_json;
 extern crate slog_term;
 extern crate toml;
 
