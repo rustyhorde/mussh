@@ -13,6 +13,7 @@ use std::net::{TcpStream, ToSocketAddrs};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::thread;
+use std::time::Instant;
 
 fn setup_hostnames(config: &MusshToml, matches: &ArgMatches) -> MusshResult<Vec<String>> {
     let stdout = Logger::root(STDOUT_SW.drain(), o!());
@@ -114,6 +115,7 @@ fn execute<A: ToSocketAddrs>(hostname: String,
     let file_async = level_filter(Level::Trace,
                                   async_stream(outfile, slog_term::format_plain()));
     let file_logger = Logger::root(file_async, o!());
+    let timer = Instant::now();
 
     if &hostname == "localhost" {
         let mut cmd = Command::new("/usr/bin/fish");
@@ -131,7 +133,13 @@ fn execute<A: ToSocketAddrs>(hostname: String,
             match child.wait() {
                 Ok(status) => {
                     if let Some(code) = status.code() {
-                        info!(stdout, "execute", "hostname" => hn, "code" => code);
+                        info!(
+                            stdout,
+                            "execute",
+                            "hostname" => hn,
+                            "code" => code,
+                            "duration" => timer.elapsed().as_secs()
+                        );
                     } else {
                         error!(stderr, "execute", "hostname" => hn, "error" => "No exit code");
                     }
@@ -141,52 +149,55 @@ fn execute<A: ToSocketAddrs>(hostname: String,
                 }
             }
         }
-        Ok(())
-    } else {
-        if let Some(mut sess) = Session::new() {
-            trace!(stdout, "execute", "message" => "Session established");
-            let tcp = TcpStream::connect(host)?;
-            sess.handshake(&tcp)?;
-            if let Some(pem) = pem {
-                sess.userauth_pubkey_file(&username, None, Path::new(&pem), None)?;
-            } else {
-                sess.userauth_agent(&username)?;
+    } else if let Some(mut sess) = Session::new() {
+        trace!(stdout, "execute", "message" => "Session established");
+        let tcp = TcpStream::connect(host)?;
+        sess.handshake(&tcp)?;
+        if let Some(pem) = pem {
+            sess.userauth_pubkey_file(&username, None, Path::new(&pem), None)?;
+        } else {
+            sess.userauth_agent(&username)?;
+        }
+
+        if sess.authenticated() {
+            let mut channel = sess.channel_session()?;
+            channel.exec(&command)?;
+            let hn = hostname.clone();
+
+            {
+                let stdout_stream = channel.stream(0);
+                let stdout_reader = BufReader::new(stdout_stream);
+
+                for line in stdout_reader.lines() {
+                    trace!(file_logger, "execute", "hostname" => hn, "line" => line.expect(""));
+                }
             }
 
-            if sess.authenticated() {
-                let mut channel = sess.channel_session()?;
-                channel.exec(&command)?;
-                let hn = hostname.clone();
-
-                {
-                    let stdout_stream = channel.stream(0);
-                    let stdout_reader = BufReader::new(stdout_stream);
-
-                    for line in stdout_reader.lines() {
-                        trace!(file_logger, "execute", "hostname" => hn, "line" => line.expect(""));
+            match channel.exit_status() {
+                Ok(code) => {
+                    if code == 0 {
+                        info!(
+                            stdout,
+                            "execute", "hostname" => hn,
+                            "code" => code,
+                            "duration" => timer.elapsed().as_secs()
+                        );
+                    } else {
+                        error!(stderr, "execute", "hostname" => hn, "code" => code);
                     }
                 }
-
-                match channel.exit_status() {
-                    Ok(code) => {
-                        if code == 0 {
-                            info!(stdout, "execute", "hostname" => hn, "code" => code);
-                        } else {
-                            error!(stderr, "execute", "hostname" => hn, "code" => code);
-                        }
-                    }
-                    Err(e) => {
-                        error!(stderr, "execute", "hostname" => hn, "error" => format!("{}", e));
-                    }
+                Err(e) => {
+                    error!(stderr, "execute", "hostname" => hn, "error" => format!("{}", e));
                 }
-            } else {
-                return Err(MusshErr::Auth);
             }
         } else {
-            return Err(MusshErr::InvalidSshSession);
+            return Err(MusshErr::Auth);
         }
-        Ok(())
+    } else {
+        return Err(MusshErr::InvalidSshSession);
     }
+
+    Ok(())
 }
 
 fn multiplex(config: MusshToml, matches: ArgMatches) -> MusshResult<()> {
