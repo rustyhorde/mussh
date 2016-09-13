@@ -22,12 +22,15 @@ extern crate slog;
 
 extern crate rustc_serialize;
 extern crate ssh2;
+extern crate slog_atomic;
+extern crate slog_json;
+extern crate slog_stream;
 extern crate slog_term;
 extern crate toml;
 
 use error::MusshErr;
-use slog::{AtomicSwitchCtrl, Level, async_stream, level_filter};
-use std::io;
+use slog::{Level, level_filter};
+use slog_atomic::AtomicSwitchCtrl;
 use std::process;
 
 mod config;
@@ -41,15 +44,12 @@ pub const PKG: Option<&'static str> = option_env!("CARGO_PKG_NAME");
 
 lazy_static! {
     /// stdout Drain switch
-    pub static ref STDOUT_SW: AtomicSwitchCtrl = AtomicSwitchCtrl::new(
-        level_filter(
-            Level::Info,
-            async_stream(io::stdout(), slog_term::format_colored())
-        )
+    pub static ref STDOUT_SW: AtomicSwitchCtrl<std::io::Error> = AtomicSwitchCtrl::new(
+        level_filter(Level::Info, slog_term::streamer().async().full().build())
     );
     /// stderr Drain switch
-    pub static ref STDERR_SW: AtomicSwitchCtrl = AtomicSwitchCtrl::new(
-        async_stream(io::stderr(), slog_term::format_colored())
+    pub static ref STDERR_SW: AtomicSwitchCtrl<std::io::Error> = AtomicSwitchCtrl::new(
+        level_filter(Level::Info, slog_term::streamer().stderr().async().full().build())
     );
 }
 

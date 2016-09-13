@@ -2,8 +2,9 @@ use {MusshResult, STDERR_SW, STDOUT_SW};
 use clap::{App, Arg, ArgMatches};
 use config::{DOT_DIR, MusshToml, STDERR_FILE, STDOUT_FILE};
 use error::MusshErr;
-use slog::{Level, Logger, async_stream, duplicate, level_filter, stream};
-use slog_term;
+use slog::{DrainExt, Level, Logger, duplicate, level_filter};
+use slog_stream::async_stream;
+use slog_term::{self, ColorDecorator, Format, FormatMode};
 use ssh2::Session;
 use std::collections::HashMap;
 use std::env;
@@ -16,14 +17,14 @@ use std::thread;
 use std::time::Instant;
 
 fn setup_hostnames(config: &MusshToml, matches: &ArgMatches) -> MusshResult<Vec<String>> {
-    let stdout = Logger::root(STDOUT_SW.drain(), o!());
+    let stdout = Logger::root(STDOUT_SW.drain().fuse(), o!());
     let mut hostnames = Vec::new();
     if let Some(hosts_arg) = matches.value_of("hosts") {
         if let Some(hosts) = config.hostlist() {
             for (name, host_config) in hosts {
                 if name == hosts_arg {
                     hostnames = host_config.hostnames().clone();
-                    trace!(stdout, "setup_hostnames", "hostnames" => format!("{:?}", hostnames));
+                    trace!(stdout, "setup_hostnames"; "hostnames" => format!("{:?}", hostnames));
                     break;
                 }
             }
@@ -40,14 +41,14 @@ fn setup_hostnames(config: &MusshToml, matches: &ArgMatches) -> MusshResult<Vec<
 }
 
 fn setup_command(config: &MusshToml, matches: &ArgMatches) -> MusshResult<String> {
-    let stdout = Logger::root(STDOUT_SW.drain(), o!());
+    let stdout = Logger::root(STDOUT_SW.drain().fuse(), o!());
     let mut cmd = String::new();
     if let Some(cmd_arg) = matches.value_of("command") {
         if let Some(cmds) = config.cmd() {
             for (name, command) in cmds {
                 if name == cmd_arg {
                     cmd = command.command().clone();
-                    trace!(stdout, "setup_command", "command" => cmd);
+                    trace!(stdout, "setup_command"; "command" => cmd);
                     break;
                 }
             }
@@ -98,8 +99,8 @@ fn execute<A: ToSocketAddrs>(hostname: String,
                              pem: Option<String>,
                              host: A)
                              -> MusshResult<()> {
-    let stdout = Logger::root(STDOUT_SW.drain(), o!());
-    let stderr = Logger::root(STDERR_SW.drain(), o!());
+    let stdout = Logger::root(STDOUT_SW.drain().fuse(), o!());
+    let stderr = Logger::root(STDERR_SW.drain().fuse(), o!());
 
     let mut host_file_path = if let Some(mut home_dir) = env::home_dir() {
         home_dir.push(DOT_DIR);
@@ -112,9 +113,9 @@ fn execute<A: ToSocketAddrs>(hostname: String,
     host_file_path.set_extension("log");
 
     let outfile = OpenOptions::new().create(true).append(true).open(host_file_path)?;
-    let file_async = level_filter(Level::Trace,
-                                  async_stream(outfile, slog_term::format_plain()));
-    let file_logger = Logger::root(file_async, o!());
+    let fmt = Format::new(FormatMode::Full, ColorDecorator::new_plain());
+    let file_async = level_filter(Level::Trace, async_stream(outfile, fmt));
+    let file_logger = Logger::root(file_async.fuse(), o!());
     let timer = Instant::now();
 
     if &hostname == "localhost" {
@@ -127,7 +128,7 @@ fn execute<A: ToSocketAddrs>(hostname: String,
             let stdout_reader = BufReader::new(child.stdout.take().expect(""));
             let hn = hostname.clone();
             for line in stdout_reader.lines() {
-                trace!(file_logger, "execute", "hostname" => hn, "line" => line.expect(""));
+                trace!(file_logger, "execute"; "hostname" => hn, "line" => line.expect(""));
             }
 
             match child.wait() {
@@ -135,22 +136,22 @@ fn execute<A: ToSocketAddrs>(hostname: String,
                     if let Some(code) = status.code() {
                         info!(
                             stdout,
-                            "execute",
+                            "execute";
                             "hostname" => hn,
                             "code" => code,
                             "duration" => timer.elapsed().as_secs()
                         );
                     } else {
-                        error!(stderr, "execute", "hostname" => hn, "error" => "No exit code");
+                        error!(stderr, "execute"; "hostname" => hn, "error" => "No exit code");
                     }
                 }
                 Err(e) => {
-                    error!(stderr, "execute", "hostname" => hn, "error" => format!("{}", e));
+                    error!(stderr, "execute"; "hostname" => hn, "error" => format!("{}", e));
                 }
             }
         }
     } else if let Some(mut sess) = Session::new() {
-        trace!(stdout, "execute", "message" => "Session established");
+        trace!(stdout, "execute"; "message" => "Session established");
         let tcp = TcpStream::connect(host)?;
         sess.handshake(&tcp)?;
         if let Some(pem) = pem {
@@ -169,7 +170,7 @@ fn execute<A: ToSocketAddrs>(hostname: String,
                 let stdout_reader = BufReader::new(stdout_stream);
 
                 for line in stdout_reader.lines() {
-                    trace!(file_logger, "execute", "hostname" => hn, "line" => line.expect(""));
+                    trace!(file_logger, "execute"; "hostname" => hn, "line" => line.expect(""));
                 }
             }
 
@@ -178,16 +179,17 @@ fn execute<A: ToSocketAddrs>(hostname: String,
                     if code == 0 {
                         info!(
                             stdout,
-                            "execute", "hostname" => hn,
+                            "execute";
+                            "hostname" => hn,
                             "code" => code,
                             "duration" => timer.elapsed().as_secs()
                         );
                     } else {
-                        error!(stderr, "execute", "hostname" => hn, "code" => code);
+                        error!(stderr, "execute"; "hostname" => hn, "code" => code);
                     }
                 }
                 Err(e) => {
-                    error!(stderr, "execute", "hostname" => hn, "error" => format!("{}", e));
+                    error!(stderr, "execute"; "hostname" => hn, "error" => format!("{}", e));
                 }
             }
         } else {
@@ -214,9 +216,9 @@ fn multiplex(config: MusshToml, matches: ArgMatches) -> MusshResult<()> {
                 if let Some(alias) = alias_map.get(cmd_arg) {
                     if let Some(cmds) = config.cmd() {
                         if let Some(alias_cmd) = cmds.get(alias) {
-                            let stdout = Logger::root(STDOUT_SW.drain(), o!());
+                            let stdout = Logger::root(STDOUT_SW.drain().fuse(), o!());
                             let a_cmd = alias_cmd.command().clone();
-                            trace!(stdout, "multiplex", "hostname" => t_hostname, "alias" => a_cmd);
+                            trace!(stdout, "multiplex"; "hostname" => t_hostname, "alias" => a_cmd);
                             a_cmd
                         } else {
                             cmd.clone()
@@ -272,22 +274,23 @@ fn setup_file_log(matches: &ArgMatches, level: Level, stdout: bool) {
     }
 
     if let Ok(log_file) = OpenOptions::new().create(true).append(true).open(file_path) {
-        file_drain = Some(stream(log_file, slog_term::format_plain()));
+        let fmt = Format::new(FormatMode::Full, ColorDecorator::new_plain());
+        file_drain = Some(async_stream(log_file, fmt));
     }
 
     let base = if stdout {
-        level_filter(level,
-                     async_stream(io::stdout(), slog_term::format_colored()))
+        level_filter(level, slog_term::streamer().async().full().build())
     } else {
-        level_filter(level,
-                     async_stream(io::stderr(), slog_term::format_colored()))
+        level_filter(level, slog_term::streamer().stderr().async().full().build())
     };
 
     if let Some(file) = file_drain {
         if stdout {
-            STDOUT_SW.set(duplicate(base, file));
+            STDOUT_SW.set(duplicate(base, file)
+                .map_err(|_| io::Error::new(io::ErrorKind::Other, "blah")));
         } else {
-            STDERR_SW.set(duplicate(base, file));
+            STDERR_SW.set(duplicate(base, file)
+                .map_err(|_| io::Error::new(io::ErrorKind::Other, "blah")));
         }
     } else if stdout {
         STDOUT_SW.set(base);
@@ -358,12 +361,12 @@ pub fn run(opt_args: Option<Vec<&str>>) -> i32 {
     setup_file_log(&matches, level, false);
 
     if matches.is_present("dry_run") {
-        let stdout = Logger::root(STDOUT_SW.drain(), o!());
-        warn!(stdout, "run", "message" => "Not starting multiplex!", "dryrun" => "true");
+        let stdout = Logger::root(STDOUT_SW.drain().fuse(), o!());
+        warn!(stdout, "run"; "message" => "Not starting multiplex!", "dryrun" => "true");
         0
     } else if let Err(e) = multiplex(MusshToml::new(&matches), matches) {
-        let stderr = Logger::root(STDERR_SW.drain(), o!());
-        error!(stderr, "run", "error" => "error running multiplex", "detail" => format!("{}", e));
+        let stderr = Logger::root(STDERR_SW.drain().fuse(), o!());
+        error!(stderr, "run"; "error" => "error running multiplex", "detail" => format!("{}", e));
         1
     } else {
         0
