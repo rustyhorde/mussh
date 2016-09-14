@@ -14,17 +14,21 @@ version = "0.1.1"
 clap = "~2"
 lazy_static = "~0"
 rustc-serialize = "~0"
-slog = "~1.0.0-alpha"
 slog-atomic = "0.3.0"
-slog-json = "1.0.0-alpha6"
-slog-stream = "1.0.0-alpha6"
-slog-term = "~1.0.0-alpha"
+slog-json = "1.0.0-alpha7"
+slog-stream = "1.0.0-alpha7"
+slog-term = "~1.0.0-alpha7"
 ssh2 = "~0"
 toml = "~0"
 
 [dependencies.clippy]
 optional = true
 version = "~0"
+
+[dependencies.slog]
+version = "1.0.0-alpha7"
+default-features = false
+features = ["max_level_trace","release_max_level_trace"]
 
 [features]
 lint = ["clippy"]

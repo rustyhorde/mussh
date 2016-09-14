@@ -3,7 +3,7 @@ use clap::{App, Arg, ArgMatches};
 use config::{DOT_DIR, MusshToml, STDERR_FILE, STDOUT_FILE};
 use error::MusshErr;
 use slog::{DrainExt, Level, Logger, duplicate, level_filter};
-use slog_stream::async_stream;
+use slog_stream::{async_stream, stream};
 use slog_term::{self, ColorDecorator, Format, FormatMode};
 use ssh2::Session;
 use std::collections::HashMap;
@@ -112,9 +112,9 @@ fn execute<A: ToSocketAddrs>(hostname: String,
     host_file_path.push(hostname.clone());
     host_file_path.set_extension("log");
 
-    let outfile = OpenOptions::new().create(true).append(true).open(host_file_path)?;
+    let outfile = OpenOptions::new().create(true).append(true).open(&host_file_path)?;
     let fmt = Format::new(FormatMode::Full, ColorDecorator::new_plain());
-    let file_async = level_filter(Level::Trace, async_stream(outfile, fmt));
+    let file_async = level_filter(Level::Trace, stream(outfile, fmt));
     let file_logger = Logger::root(file_async.fuse(), o!());
     let timer = Instant::now();
 
@@ -287,10 +287,10 @@ fn setup_file_log(matches: &ArgMatches, level: Level, stdout: bool) {
     if let Some(file) = file_drain {
         if stdout {
             STDOUT_SW.set(duplicate(base, file)
-                .map_err(|_| io::Error::new(io::ErrorKind::Other, "blah")));
+                .map_err(|_| io::Error::new(io::ErrorKind::Other, "Unable to duplicate drain")));
         } else {
             STDERR_SW.set(duplicate(base, file)
-                .map_err(|_| io::Error::new(io::ErrorKind::Other, "blah")));
+                .map_err(|_| io::Error::new(io::ErrorKind::Other, "Unable to duplicate drain")));
         }
     } else if stdout {
         STDOUT_SW.set(base);

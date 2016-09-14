@@ -1,16 +1,16 @@
 [root]
 name = "mussh"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "clap 2.12.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "clippy 0.0.90 (registry+https://github.com/rust-lang/crates.io-index)",
  "lazy_static 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "rustc-serialize 0.3.19 (registry+https://github.com/rust-lang/crates.io-index)",
- "slog 1.0.0-alpha6 (registry+https://github.com/rust-lang/crates.io-index)",
+ "slog 1.0.0-alpha7 (registry+https://github.com/rust-lang/crates.io-index)",
  "slog-atomic 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "slog-json 1.0.0-alpha6 (registry+https://github.com/rust-lang/crates.io-index)",
- "slog-stream 1.0.0-alpha6 (registry+https://github.com/rust-lang/crates.io-index)",
- "slog-term 1.0.0-alpha6 (registry+https://github.com/rust-lang/crates.io-index)",
+ "slog-json 1.0.0-alpha7 (registry+https://github.com/rust-lang/crates.io-index)",
+ "slog-stream 1.0.0-alpha7 (registry+https://github.com/rust-lang/crates.io-index)",
+ "slog-term 1.0.0-alpha7 (registry+https://github.com/rust-lang/crates.io-index)",
  "ssh2 0.2.13 (registry+https://github.com/rust-lang/crates.io-index)",
  "toml 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
@@ -287,7 +287,7 @@ dependencies = [
 
 [[package]]
 name = "slog"
-version = "1.0.0-alpha6"
+version = "1.0.0-alpha7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
@@ -296,48 +296,48 @@ version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "crossbeam 0.2.10 (registry+https://github.com/rust-lang/crates.io-index)",
- "slog 1.0.0-alpha6 (registry+https://github.com/rust-lang/crates.io-index)",
+ "slog 1.0.0-alpha7 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
 name = "slog-json"
-version = "1.0.0-alpha6"
+version = "1.0.0-alpha7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "chrono 0.2.25 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde_json 0.7.4 (registry+https://github.com/rust-lang/crates.io-index)",
- "slog 1.0.0-alpha6 (registry+https://github.com/rust-lang/crates.io-index)",
- "slog-serde 1.0.0-alpha6 (registry+https://github.com/rust-lang/crates.io-index)",
- "slog-stream 1.0.0-alpha6 (registry+https://github.com/rust-lang/crates.io-index)",
+ "slog 1.0.0-alpha7 (registry+https://github.com/rust-lang/crates.io-index)",
+ "slog-serde 1.0.0-alpha7 (registry+https://github.com/rust-lang/crates.io-index)",
+ "slog-stream 1.0.0-alpha7 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
 name = "slog-serde"
-version = "1.0.0-alpha6"
+version = "1.0.0-alpha7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "serde 0.7.15 (registry+https://github.com/rust-lang/crates.io-index)",
- "slog 1.0.0-alpha6 (registry+https://github.com/rust-lang/crates.io-index)",
+ "slog 1.0.0-alpha7 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
 name = "slog-stream"
-version = "1.0.0-alpha6"
+version = "1.0.0-alpha7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
- "slog 1.0.0-alpha6 (registry+https://github.com/rust-lang/crates.io-index)",
+ "slog 1.0.0-alpha7 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
 name = "slog-term"
-version = "1.0.0-alpha6"
+version = "1.0.0-alpha7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "ansi_term 0.7.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "chrono 0.2.25 (registry+https://github.com/rust-lang/crates.io-index)",
  "isatty 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
- "slog 1.0.0-alpha6 (registry+https://github.com/rust-lang/crates.io-index)",
- "slog-stream 1.0.0-alpha6 (registry+https://github.com/rust-lang/crates.io-index)",
+ "slog 1.0.0-alpha7 (registry+https://github.com/rust-lang/crates.io-index)",
+ "slog-stream 1.0.0-alpha7 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -476,12 +476,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 "checksum semver 0.2.3 (registry+https://github.com/rust-lang/crates.io-index)" = "2d5b7638a1f03815d94e88cb3b3c08e87f0db4d683ef499d1836aaf70a45623f"
 "checksum serde 0.7.15 (registry+https://github.com/rust-lang/crates.io-index)" = "1b0e0732aa8ec4267f61815a396a942ba3525062e3bd5520aa8419927cfc0a92"
 "checksum serde_json 0.7.4 (registry+https://github.com/rust-lang/crates.io-index)" = "b22e8a0554f31cb0f501e027de07b253553b308124f61c57598b9678dba35c0b"
-"checksum slog 1.0.0-alpha6 (registry+https://github.com/rust-lang/crates.io-index)" = "7b555fc4076f77fb342a5d3413977dcc81d0ace6d9a79c63e72567ba997b0140"
+"checksum slog 1.0.0-alpha7 (registry+https://github.com/rust-lang/crates.io-index)" = "56505f4b06bd31e5873a9323fd10c476c9d06a3ac638f15db4dc01bdaf21a373"
 "checksum slog-atomic 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)" = "9c8efda621be2e76594e9696322487a3ba8dc1105f6fe2cc956bd5e99bbf4158"
-"checksum slog-json 1.0.0-alpha6 (registry+https://github.com/rust-lang/crates.io-index)" = "e359c7f9ba53bce9557eec45ff98c6d0d9088be6a96998426e265a4e4c861b72"
-"checksum slog-serde 1.0.0-alpha6 (registry+https://github.com/rust-lang/crates.io-index)" = "b24a25eedc066a1b8fb65a1370990844d2cfe236df7169ac11a454796c4dcdef"
-"checksum slog-stream 1.0.0-alpha6 (registry+https://github.com/rust-lang/crates.io-index)" = "00493d927516cf5233a900444a2241556b9019fa2a99f85fd8a68604e8703d2e"
-"checksum slog-term 1.0.0-alpha6 (registry+https://github.com/rust-lang/crates.io-index)" = "7d005663aaf80a4f95d89131defd52d879206e9fa406691338657788773170dd"
+"checksum slog-json 1.0.0-alpha7 (registry+https://github.com/rust-lang/crates.io-index)" = "62d0a6e6e6ec5ee71b1b2095380c3f16adee0f3903e7d6e8aa8331262494633b"
+"checksum slog-serde 1.0.0-alpha7 (registry+https://github.com/rust-lang/crates.io-index)" = "fd49db67ee9f443e2d63d64a1bee7495f47c2c8bc2c0d293a0d1accecb6503a8"
+"checksum slog-stream 1.0.0-alpha7 (registry+https://github.com/rust-lang/crates.io-index)" = "2fc5e9826e9cef657dbfeda12c8d83c3126c9ec4848a6d36920afc82b01138a4"
+"checksum slog-term 1.0.0-alpha7 (registry+https://github.com/rust-lang/crates.io-index)" = "1093a168cee7a9bb04dd650bc918d83fcb53c8281f5f6ae8cba2631f891df92b"
 "checksum ssh2 0.2.13 (registry+https://github.com/rust-lang/crates.io-index)" = "c1d167b6661aafa82d5b48b077989b8aa2ec12a74337f047c5f75128ebeef471"
 "checksum strsim 0.5.1 (registry+https://github.com/rust-lang/crates.io-index)" = "50c069df92e4b01425a8bf3576d5d417943a6a7272fbabaf5bd80b1aaa76442e"
 "checksum tempdir 0.3.5 (registry+https://github.com/rust-lang/crates.io-index)" = "87974a6f5c1dfb344d733055601650059a3363de2a6104819293baff662132d6"
