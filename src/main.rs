@@ -30,7 +30,7 @@ extern crate toml;
 
 use error::MusshErr;
 use slog::{Level, level_filter};
-use slog_atomic::AtomicSwitchCtrl;
+use slog_atomic::{AtomicSwitch, AtomicSwitchCtrl};
 use std::process;
 
 mod config;
@@ -44,13 +44,13 @@ pub const PKG: Option<&'static str> = option_env!("CARGO_PKG_NAME");
 
 lazy_static! {
     /// stdout Drain switch
-    pub static ref STDOUT_SW: AtomicSwitchCtrl<std::io::Error> = AtomicSwitchCtrl::new(
+    pub static ref STDOUT_SW: AtomicSwitchCtrl<std::io::Error> = AtomicSwitch::new(
         level_filter(Level::Info, slog_term::streamer().async().full().build())
-    );
+    ).ctrl();
     /// stderr Drain switch
-    pub static ref STDERR_SW: AtomicSwitchCtrl<std::io::Error> = AtomicSwitchCtrl::new(
+    pub static ref STDERR_SW: AtomicSwitchCtrl<std::io::Error> = AtomicSwitch::new(
         level_filter(Level::Info, slog_term::streamer().stderr().async().full().build())
-    );
+    ).ctrl();
 }
 
 /// Result used in mussh.

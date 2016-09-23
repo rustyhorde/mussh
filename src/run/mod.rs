@@ -8,6 +8,7 @@ use slog_term::{self, ColorDecorator, Format, FormatMode};
 use ssh2::Session;
 use std::collections::HashMap;
 use std::env;
+use std::error::Error;
 use std::fs::{self, OpenOptions};
 use std::io::{self, BufRead, BufReader};
 use std::net::{TcpStream, ToSocketAddrs};
@@ -151,16 +152,28 @@ fn execute<A: ToSocketAddrs>(hostname: String,
             }
         }
     } else if let Some(mut sess) = Session::new() {
-        trace!(stdout, "execute"; "message" => "Session established");
         let tcp = TcpStream::connect(host)?;
         sess.handshake(&tcp)?;
         if let Some(pem) = pem {
             sess.userauth_pubkey_file(&username, None, Path::new(&pem), None)?;
         } else {
-            sess.userauth_agent(&username)?;
+            trace!(stdout, "execute"; "message" => "Agent Auth Setup", "username" => username);
+            let mut agent = sess.agent()?;
+            agent.connect()?;
+            agent.list_identities()?;
+            for identity in agent.identities() {
+                if let Ok(ref id) = identity {
+                    if let Ok(_) = agent.userauth(&username, id) {
+                        break;
+                    }
+                }
+            }
+            agent.disconnect()?;
+            // sess.userauth_agent(&username)?;
         }
 
         if sess.authenticated() {
+            trace!(stdout, "execute"; "message" => "Authenticated");
             let mut channel = sess.channel_session()?;
             channel.exec(&command)?;
             let hn = hostname.clone();
@@ -237,13 +250,16 @@ fn multiplex(config: MusshToml, matches: ArgMatches) -> MusshResult<()> {
         };
 
         children.push(thread::spawn(move || {
-            execute(t_hostname, t_cmd, username, pem, (&hn[..], port))
+            if let Err(e) = execute(t_hostname, t_cmd, username, pem, (&hn[..], port)) {
+                println!("{}", e.description());
+            }
         }));
     }
 
     let mut errors = Vec::new();
     for child in children {
         if let Err(e) = child.join() {
+            println!("{:?}", e);
             errors.push(e);
         }
     }
