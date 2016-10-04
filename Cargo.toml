@@ -14,10 +14,10 @@ version = "0.1.2"
 clap = "~2"
 lazy_static = "~0"
 rustc-serialize = "~0"
-slog-atomic = "0.3.0"
-slog-json = "1.0.0-alpha7"
-slog-stream = "1.0.0-alpha7"
-slog-term = "~1.0.0-alpha7"
+slog-atomic = "~0.4.0"
+slog-json = "~1.0.0"
+slog-stream = "~1.1.0"
+slog-term = "~1.1.0"
 ssh2 = "~0"
 toml = "~0"
 
@@ -26,7 +26,7 @@ optional = true
 version = "~0"
 
 [dependencies.slog]
-version = "1.0.0-alpha7"
+version = "~1.0.0"
 default-features = false
 features = ["max_level_trace","release_max_level_trace"]
 

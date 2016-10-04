@@ -4,7 +4,7 @@ use config::{DOT_DIR, MusshToml, STDERR_FILE, STDOUT_FILE};
 use error::MusshErr;
 use slog::{DrainExt, Level, Logger, duplicate, level_filter};
 use slog_stream::{async_stream, stream};
-use slog_term::{self, ColorDecorator, Format, FormatMode};
+use slog_term::{self, ColorDecorator, Format, FormatMode, timestamp_utc};
 use ssh2::Session;
 use std::collections::HashMap;
 use std::env;
@@ -114,7 +114,9 @@ fn execute<A: ToSocketAddrs>(hostname: String,
     host_file_path.set_extension("log");
 
     let outfile = OpenOptions::new().create(true).append(true).open(&host_file_path)?;
-    let fmt = Format::new(FormatMode::Full, ColorDecorator::new_plain());
+    let fmt = Format::new(FormatMode::Full,
+                          ColorDecorator::new_plain(),
+                          Box::new(timestamp_utc));
     let file_async = level_filter(Level::Trace, stream(outfile, fmt));
     let file_logger = Logger::root(file_async.fuse(), o!());
     let timer = Instant::now();
@@ -290,7 +292,9 @@ fn setup_file_log(matches: &ArgMatches, level: Level, stdout: bool) {
     }
 
     if let Ok(log_file) = OpenOptions::new().create(true).append(true).open(file_path) {
-        let fmt = Format::new(FormatMode::Full, ColorDecorator::new_plain());
+        let fmt = Format::new(FormatMode::Full,
+                              ColorDecorator::new_plain(),
+                              Box::new(timestamp_utc));
         file_drain = Some(async_stream(log_file, fmt));
     }
 
