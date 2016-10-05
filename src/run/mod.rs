@@ -222,7 +222,7 @@ fn multiplex(config: MusshToml, matches: ArgMatches) -> MusshResult<()> {
     let cmd = setup_command(&config, &matches)?;
     let mut children = Vec::new();
 
-    for hostname in hostnames.into_iter() {
+    for hostname in hostnames {
         let t_hostname = hostname.clone();
         let (username, hn, port, pem, alias) = setup_host(&config, &t_hostname)?;
 
