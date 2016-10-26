@@ -11,7 +11,6 @@
 #![cfg_attr(feature="clippy", plugin(clippy))]
 #![cfg_attr(feature="clippy", deny(clippy))]
 #![deny(missing_docs)]
-#![feature(question_mark)]
 
 #[macro_use]
 extern crate clap;
