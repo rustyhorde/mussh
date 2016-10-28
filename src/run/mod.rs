@@ -171,7 +171,6 @@ fn execute<A: ToSocketAddrs>(hostname: String,
                 }
             }
             agent.disconnect()?;
-            // sess.userauth_agent(&username)?;
         }
 
         if sess.authenticated() {
