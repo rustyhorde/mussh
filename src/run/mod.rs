@@ -250,10 +250,12 @@ fn multiplex(config: MusshToml, matches: ArgMatches) -> MusshResult<()> {
             cmd.clone()
         };
 
-        children.push(thread::spawn(move || {
-            if let Err(e) = execute(t_hostname, t_cmd, username, pem, (&hn[..], port)) {
-                println!("{}", e.description());
-            }
+        children.push(thread::spawn(move || if let Err(e) = execute(t_hostname,
+                                                                         t_cmd,
+                                                                         username,
+                                                                         pem,
+                                                                         (&hn[..], port)) {
+            println!("{}", e.description());
         }));
     }
 
