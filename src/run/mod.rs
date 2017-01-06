@@ -165,7 +165,7 @@ fn execute<A: ToSocketAddrs>(hostname: String,
             agent.list_identities()?;
             for identity in agent.identities() {
                 if let Ok(ref id) = identity {
-                    if let Ok(_) = agent.userauth(&username, id) {
+                    if agent.userauth(&username, id).is_ok() {
                         break;
                     }
                 }
@@ -371,10 +371,8 @@ pub fn run(opt_args: Option<Vec<&str>>) -> i32 {
     // Create the dot dir if it doesn't exist.
     if let Some(mut home_dir) = env::home_dir() {
         home_dir.push(DOT_DIR);
-        if let Err(_) = fs::metadata(&home_dir) {
-            if let Err(_) = fs::create_dir_all(home_dir) {
-                return 1;
-            }
+        if fs::metadata(&home_dir).is_err() && fs::create_dir_all(home_dir).is_err() {
+            return 1;
         }
     }
 

@@ -52,7 +52,7 @@ impl MusshToml {
         for path in &paths(matches.value_of("config")) {
             if let Ok(mut config_file) = File::open(path) {
                 let mut toml_buf = vec![];
-                if let Ok(_) = config_file.read_to_end(&mut toml_buf) {
+                if config_file.read_to_end(&mut toml_buf).is_ok() {
                     let toml_str = String::from_utf8_lossy(&toml_buf);
                     if let Some(parsed) = toml::decode_str(&toml_str) {
                         toml = parsed;
