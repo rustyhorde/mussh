@@ -1,3 +1,4 @@
+//! runtime for mussh.
 use {MusshResult, STDERR_SW, STDOUT_SW};
 use clap::{App, Arg, ArgMatches};
 use config::{DOT_DIR, MusshToml, STDERR_FILE, STDOUT_FILE};
@@ -10,13 +11,14 @@ use std::collections::HashMap;
 use std::env;
 use std::error::Error;
 use std::fs::{self, OpenOptions};
-use std::io::{self, BufRead, BufReader};
+use std::io::{self, BufRead, BufReader, Write};
 use std::net::{TcpStream, ToSocketAddrs};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::thread;
 use std::time::Instant;
 
+/// Setup the hostnames from the toml config.
 fn setup_hostnames(config: &MusshToml, matches: &ArgMatches) -> MusshResult<Vec<String>> {
     let stdout = Logger::root(STDOUT_SW.drain().fuse(), o!());
     let mut hostnames = Vec::new();
@@ -25,7 +27,9 @@ fn setup_hostnames(config: &MusshToml, matches: &ArgMatches) -> MusshResult<Vec<
             for (name, host_config) in hosts {
                 if name == hosts_arg {
                     hostnames = host_config.hostnames().clone();
-                    trace!(stdout, "setup_hostnames"; "hostnames" => format!("{:?}", hostnames));
+                    for hostname in &hostnames {
+                        trace!(stdout, "Setup {}", hostname);
+                    }
                     break;
                 }
             }
@@ -41,6 +45,7 @@ fn setup_hostnames(config: &MusshToml, matches: &ArgMatches) -> MusshResult<Vec<
     }
 }
 
+/// Setup a command from the toml config.
 fn setup_command(config: &MusshToml, matches: &ArgMatches) -> MusshResult<String> {
     let stdout = Logger::root(STDOUT_SW.drain().fuse(), o!());
     let mut cmd = String::new();
@@ -65,8 +70,10 @@ fn setup_command(config: &MusshToml, matches: &ArgMatches) -> MusshResult<String
     }
 }
 
+/// Config Tuple Type.
 type ConfigTuple = (String, String, u16, Option<String>, Option<HashMap<String, String>>);
 
+/// Setup the host from the toml config.
 fn setup_host(config: &MusshToml, hostname: &str) -> MusshResult<ConfigTuple> {
     if let Some(hosts) = config.hosts() {
         if let Some(host) = hosts.get(hostname) {
@@ -94,6 +101,7 @@ fn setup_host(config: &MusshToml, hostname: &str) -> MusshResult<ConfigTuple> {
     }
 }
 
+/// Execute the command on the host.
 fn execute<A: ToSocketAddrs>(hostname: String,
                              command: String,
                              username: String,
@@ -216,6 +224,7 @@ fn execute<A: ToSocketAddrs>(hostname: String,
     Ok(())
 }
 
+/// Run the commond over the hosts.
 fn multiplex(config: MusshToml, matches: ArgMatches) -> MusshResult<()> {
     let hostnames = setup_hostnames(&config, &matches)?;
     let cmd = setup_command(&config, &matches)?;
@@ -255,14 +264,13 @@ fn multiplex(config: MusshToml, matches: ArgMatches) -> MusshResult<()> {
                                                                          username,
                                                                          pem,
                                                                          (&hn[..], port)) {
-            println!("{}", e.description());
+            writeln!(io::stdout(), "{}", e.description()).expect("unable to write to stdout");
         }));
     }
 
     let mut errors = Vec::new();
     for child in children {
         if let Err(e) = child.join() {
-            println!("{:?}", e);
             errors.push(e);
         }
     }
@@ -275,6 +283,7 @@ fn multiplex(config: MusshToml, matches: ArgMatches) -> MusshResult<()> {
     }
 }
 
+/// Setup the file logging.
 fn setup_file_log(matches: &ArgMatches, level: Level, stdout: bool) {
     let mut file_drain = None;
     let mut file_path = if let Some(logdir) = matches.value_of("logdir") {
@@ -320,6 +329,7 @@ fn setup_file_log(matches: &ArgMatches, level: Level, stdout: bool) {
     }
 }
 
+/// run mussh
 pub fn run(opt_args: Option<Vec<&str>>) -> i32 {
     let app = App::new("mussh")
         .version(crate_version!())
@@ -371,7 +381,7 @@ pub fn run(opt_args: Option<Vec<&str>>) -> i32 {
     // Create the dot dir if it doesn't exist.
     if let Some(mut home_dir) = env::home_dir() {
         home_dir.push(DOT_DIR);
-        if fs::metadata(&home_dir).is_err() && fs::create_dir_all(home_dir).is_err() {
+        if fs::metadata(&home_dir).is_err() || fs::create_dir_all(home_dir).is_err() {
             return 1;
         }
     }

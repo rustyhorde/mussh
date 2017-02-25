@@ -7,9 +7,7 @@
 // modified, or distributed except according to those terms.
 
 //! mussh - SSH Multiplexing
-#![cfg_attr(feature="clippy", feature(plugin))]
-#![cfg_attr(feature="clippy", plugin(clippy))]
-#![cfg_attr(feature="clippy", deny(clippy))]
+#![cfg_attr(feature="cargo-clippy", allow(unseparated_literal_suffix))]
 #![deny(missing_docs)]
 
 #[macro_use]
@@ -17,10 +15,12 @@ extern crate clap;
 #[macro_use]
 extern crate lazy_static;
 #[macro_use]
+extern crate serde_derive;
+#[macro_use]
 extern crate slog;
 
-extern crate rustc_serialize;
 extern crate ssh2;
+extern crate serde;
 extern crate slog_atomic;
 extern crate slog_json;
 extern crate slog_stream;
@@ -55,6 +55,7 @@ lazy_static! {
 /// Result used in mussh.
 pub type MusshResult<T> = Result<T, MusshErr>;
 
+/// mussh entry point
 fn main() {
     process::exit(run::run(None));
 }
