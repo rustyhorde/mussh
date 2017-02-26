@@ -44,11 +44,11 @@ pub const PKG: Option<&'static str> = option_env!("CARGO_PKG_NAME");
 lazy_static! {
     /// stdout Drain switch
     pub static ref STDOUT_SW: AtomicSwitchCtrl<std::io::Error> = AtomicSwitch::new(
-        level_filter(Level::Info, slog_term::streamer().async().full().build())
+        level_filter(Level::Info, slog_term::streamer().async().compact().build())
     ).ctrl();
     /// stderr Drain switch
     pub static ref STDERR_SW: AtomicSwitchCtrl<std::io::Error> = AtomicSwitch::new(
-        level_filter(Level::Info, slog_term::streamer().stderr().async().full().build())
+        level_filter(Level::Info, slog_term::streamer().stderr().compact().build())
     ).ctrl();
 }
 

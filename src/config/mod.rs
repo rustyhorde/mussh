@@ -1,4 +1,5 @@
 //! mussh configuration
+use MusshErr;
 use clap::ArgMatches;
 use std::collections::HashMap;
 use std::env;
@@ -46,7 +47,7 @@ pub struct Host {
     /// A username.
     username: String,
     /// A command alias.
-    alias: Vec<Alias>,
+    alias: Option<Vec<Alias>>,
 }
 
 #[derive(Debug, Default, Deserialize)]
@@ -67,23 +68,19 @@ pub struct Alias {
 
 impl MusshToml {
     /// Create a new 'MusshToml' from mussh.toml on the filesystem.
-    pub fn new(matches: &ArgMatches) -> MusshToml {
-        let mut toml: MusshToml = Default::default();
-
+    pub fn new(matches: &ArgMatches) -> Result<MusshToml, MusshErr> {
         for path in &paths(matches.value_of("config")) {
             if let Ok(mut config_file) = File::open(path) {
                 let mut toml_buf = vec![];
-                if config_file.read_to_end(&mut toml_buf).is_ok() {
-                    let toml_str = String::from_utf8_lossy(&toml_buf);
-                    if let Ok(parsed) = toml::from_str(&toml_str) {
-                        toml = parsed;
-                        break;
-                    }
+                config_file.read_to_end(&mut toml_buf)?;
+                let toml_str = String::from_utf8_lossy(&toml_buf);
+                if let Ok(parsed) = toml::from_str(&toml_str) {
+                    return Ok(parsed);
                 }
             }
         }
 
-        toml
+        Err(MusshErr::Unknown)
     }
 
     /// Get the `hostlist` value.
@@ -145,8 +142,11 @@ impl Host {
     /// Get the `alias` value.
     pub fn alias(&self) -> Option<HashMap<String, String>> {
         let mut aliases = HashMap::new();
-        for alias in &self.alias {
-            aliases.insert(alias.aliasfor().clone(), alias.command().clone());
+
+        if let Some(ref alias_vec) = self.alias {
+            for alias in alias_vec {
+                aliases.insert(alias.aliasfor().clone(), alias.command().clone());
+            }
         }
 
         if aliases.is_empty() {

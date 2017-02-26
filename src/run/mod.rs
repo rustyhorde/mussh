@@ -309,18 +309,20 @@ fn setup_file_log(matches: &ArgMatches, level: Level, stdout: bool) {
     }
 
     let base = if stdout {
-        level_filter(level, slog_term::streamer().async().full().build())
+        level_filter(level, slog_term::streamer().async().compact().build())
     } else {
-        level_filter(level, slog_term::streamer().stderr().async().full().build())
+        level_filter(level, slog_term::streamer().stderr().async().compact().build())
     };
 
     if let Some(file) = file_drain {
         if stdout {
-            STDOUT_SW.set(duplicate(base, file)
-                .map_err(|_| io::Error::new(io::ErrorKind::Other, "Unable to duplicate drain")));
+            STDOUT_SW.set(duplicate(base, file).map_err(|_| {
+                io::Error::new(io::ErrorKind::Other, "Unable to duplicate drain")
+            }));
         } else {
-            STDERR_SW.set(duplicate(base, file)
-                .map_err(|_| io::Error::new(io::ErrorKind::Other, "Unable to duplicate drain")));
+            STDERR_SW.set(duplicate(base, file).map_err(|_| {
+                io::Error::new(io::ErrorKind::Other, "Unable to duplicate drain")
+            }));
         }
     } else if stdout {
         STDOUT_SW.set(base);
@@ -336,34 +338,34 @@ pub fn run(opt_args: Option<Vec<&str>>) -> i32 {
         .author("Jason Ozias <jason.g.ozias@gmail.com>")
         .about("ssh multiplexing client")
         .arg(Arg::with_name("config")
-            .short("c")
-            .long("config")
-            .value_name("CONFIG")
-            .help("Specify a non-standard path for the config file.")
-            .takes_value(true))
+                 .short("c")
+                 .long("config")
+                 .value_name("CONFIG")
+                 .help("Specify a non-standard path for the config file.")
+                 .takes_value(true))
         .arg(Arg::with_name("logdir")
-            .short("l")
-            .long("logdir")
-            .value_name("LOGDIR")
-            .help("Specify a non-standard path for the log files.")
-            .takes_value(true))
+                 .short("l")
+                 .long("logdir")
+                 .value_name("LOGDIR")
+                 .help("Specify a non-standard path for the log files.")
+                 .takes_value(true))
         .arg(Arg::with_name("dry_run")
-            .long("dryrun")
-            .help("Parse config and setup the client, but don't run it."))
+                 .long("dryrun")
+                 .help("Parse config and setup the client, but don't run it."))
         .arg(Arg::with_name("verbose")
-            .short("v")
-            .multiple(true)
-            .help("Set the output verbosity level (more v's = more verbose)"))
+                 .short("v")
+                 .multiple(true)
+                 .help("Set the output verbosity level (more v's = more verbose)"))
         .arg(Arg::with_name("hosts")
-            .value_name("hosts")
-            .help("The hosts to multiplex the command over")
-            .index(1)
-            .required(true))
+                 .value_name("hosts")
+                 .help("The hosts to multiplex the command over")
+                 .index(1)
+                 .required(true))
         .arg(Arg::with_name("command")
-            .value_name("CMD")
-            .help("The command to multiplex")
-            .index(2)
-            .required(true));
+                 .value_name("CMD")
+                 .help("The command to multiplex")
+                 .index(2)
+                 .required(true));
 
     let matches = if let Some(args) = opt_args {
         app.get_matches_from(args)
@@ -393,11 +395,15 @@ pub fn run(opt_args: Option<Vec<&str>>) -> i32 {
         let stdout = Logger::root(STDOUT_SW.drain().fuse(), o!());
         warn!(stdout, "run"; "message" => "Not starting multiplex!", "dryrun" => "true");
         0
-    } else if let Err(e) = multiplex(MusshToml::new(&matches), matches) {
-        let stderr = Logger::root(STDERR_SW.drain().fuse(), o!());
-        error!(stderr, "run"; "error" => "error running multiplex", "detail" => format!("{}", e));
-        1
+    } else if let Ok(config) = MusshToml::new(&matches) {
+        if let Err(e) = multiplex(config, matches) {
+            let stderr = Logger::root(STDERR_SW.drain().fuse(), o!());
+            error!(stderr, "run"; "error" => "error running multiplex", "detail" => format!("{}", e));
+            1
+        } else {
+            0
+        }
     } else {
-        0
+        1
     }
 }
