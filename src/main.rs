@@ -7,7 +7,7 @@
 // modified, or distributed except according to those terms.
 
 //! mussh - SSH Multiplexing
-#![cfg_attr(feature="cargo-clippy", allow(unseparated_literal_suffix))]
+#![cfg_attr(feature="cargo-clippy", allow(unseparated_literal_suffix, zero_ptr))]
 #![deny(missing_docs)]
 
 #[macro_use]
@@ -40,6 +40,7 @@ mod run;
 pub const VERSION: Option<&'static str> = option_env!("CARGO_PKG_VERSION");
 /// mussh Package Name
 pub const PKG: Option<&'static str> = option_env!("CARGO_PKG_NAME");
+
 
 lazy_static! {
     /// stdout Drain switch
