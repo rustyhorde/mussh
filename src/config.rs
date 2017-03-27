@@ -1,6 +1,17 @@
-//! mussh configuration
-use MusshErr;
+// Copyright (c) 2016 mussh developers
+//
+// Licensed under the Apache License, Version 2.0
+// <LICENSE-APACHE or http://www.apache.org/licenses/LICENSE-2.0> or the MIT
+// license <LICENSE-MIT or http://opensource.org/licenses/MIT>, at your
+// option. All files in the project carrying such notice may not be copied,
+// modified, or distributed except according to those terms.
+
+//! `mussh` config.
 use clap::ArgMatches;
+use error::{ErrorKind, Result};
+use slog::{Drain, Level, LevelFilter, Logger};
+use slog_async;
+use slog_term;
 use std::collections::HashMap;
 use std::env;
 use std::fs::File;
@@ -10,14 +21,71 @@ use toml;
 
 /// Default configuration filename.
 pub const CONFIG_FILE_NAME: &'static str = "mussh.toml";
-/// Default dot dir.
+/// Default 'dot' directory for `mussh` configuration.
 pub const DOT_DIR: &'static str = ".mussh";
-/// Default stdout log file name.
-pub const STDOUT_FILE: &'static str = "stdout.log";
-/// Default stdout log file name.
-pub const STDERR_FILE: &'static str = "stderr.log";
 
-#[derive(Debug, Default, Deserialize)]
+pub struct Logging {
+    /// The slog stdout `Logger`.
+    stdout: Logger,
+    /// The slog stderr `Logger`.
+    #[allow(dead_code)]
+    stderr: Logger,
+}
+
+impl Logging {
+    /// Get the `stdout` value.
+    pub fn stdout(&self) -> Logger {
+        self.stdout.clone()
+    }
+
+    /// Set the stdout slog 'Logger' level.
+    pub fn set_stdout_level(&mut self, level: Level) -> &mut Logging {
+        self.stdout = stdout_logger(level);
+        self
+    }
+
+    /// Get the `stderr` value.
+    pub fn stderr(&self) -> Logger {
+        self.stderr.clone()
+    }
+}
+
+impl Default for Logging {
+    fn default() -> Logging {
+        Logging {
+            stdout: stdout_logger(Level::Error),
+            stderr: stderr_logger(),
+        }
+    }
+}
+
+/// Setup the stderr slog `Logger`
+fn stderr_logger() -> Logger {
+    let stderr_decorator = slog_term::TermDecorator::new().stderr().build();
+    let stderr_drain = slog_term::CompactFormat::new(stderr_decorator).build().fuse();
+    let stderr_async_drain = slog_async::Async::new(stderr_drain).build().fuse();
+    let stderr_level_drain = LevelFilter::new(stderr_async_drain, Level::Error).fuse();
+    Logger::root(stderr_level_drain,
+                 o!(
+        "executable" => env!("CARGO_PKG_NAME"),
+        "version" => env!("CARGO_PKG_VERSION")
+    ))
+}
+
+/// Setup the stdout slog `Logger`
+fn stdout_logger(level: Level) -> Logger {
+    let stdout_decorator = slog_term::TermDecorator::new().stdout().build();
+    let stdout_drain = slog_term::CompactFormat::new(stdout_decorator).build().fuse();
+    let stdout_async_drain = slog_async::Async::new(stdout_drain).build().fuse();
+    let stdout_level_drain = LevelFilter::new(stdout_async_drain, level).fuse();
+    Logger::root(stdout_level_drain,
+                 o!(
+        "executable" => env!("CARGO_PKG_NAME"),
+        "version" => env!("CARGO_PKG_VERSION")
+    ))
+}
+
+#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq)]
 /// The base configuration.
 pub struct MusshToml {
     /// A list of hosts.
@@ -28,14 +96,14 @@ pub struct MusshToml {
     cmd: Option<HashMap<String, Command>>,
 }
 
-#[derive(Debug, Default, Deserialize)]
+#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq)]
 /// hosts configuration
 pub struct Hosts {
     /// The hostnames.
     hostnames: Vec<String>,
 }
 
-#[derive(Debug, Default, Deserialize)]
+#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq)]
 /// Host configuration.
 pub struct Host {
     /// A hostname.
@@ -50,14 +118,14 @@ pub struct Host {
     alias: Option<Vec<Alias>>,
 }
 
-#[derive(Debug, Default, Deserialize)]
+#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq)]
 /// command configuration
 pub struct Command {
     /// A Command.
     command: String,
 }
 
-#[derive(Debug, Default, Deserialize)]
+#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq)]
 /// command alias configuration.
 pub struct Alias {
     /// A command alias.
@@ -68,19 +136,19 @@ pub struct Alias {
 
 impl MusshToml {
     /// Create a new 'MusshToml' from mussh.toml on the filesystem.
-    pub fn new(matches: &ArgMatches) -> Result<MusshToml, MusshErr> {
+    pub fn new(matches: &ArgMatches) -> Result<MusshToml> {
         for path in &paths(matches.value_of("config")) {
             if let Ok(mut config_file) = File::open(path) {
                 let mut toml_buf = vec![];
-                config_file.read_to_end(&mut toml_buf)?;
-                let toml_str = String::from_utf8_lossy(&toml_buf);
-                if let Ok(parsed) = toml::from_str(&toml_str) {
-                    return Ok(parsed);
+                if config_file.read_to_end(&mut toml_buf).is_ok() {
+                    let toml_str = String::from_utf8_lossy(&toml_buf);
+                    if let Ok(parsed) = toml::from_str(&toml_str) {
+                        return Ok(parsed);
+                    }
                 }
             }
         }
-
-        Err(MusshErr::Unknown)
+        Err(ErrorKind::Config.into())
     }
 
     /// Get the `hostlist` value.
@@ -215,7 +283,7 @@ fn add_system_path(paths: &mut Vec<PathBuf>) {
 /// Add a system path to paths.
 fn add_system_path(paths: &mut Vec<PathBuf>) {
     let mut appdata = PathBuf::from("/etc");
-    appdata.push("goopd");
+    appdata.push("mussh");
     appdata.push(CONFIG_FILE_NAME);
     paths.push(appdata);
 }
