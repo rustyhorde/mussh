@@ -1,1 +1,2 @@
+closure_block_indent_threshold = 1
 reorder_imported_names = true

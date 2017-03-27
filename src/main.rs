@@ -26,16 +26,12 @@ mod config;
 mod error;
 mod run;
 
-use std::io::{self, Write};
 use std::process;
 
 /// mussh entry point
 fn main() {
     match run::run() {
         Ok(i) => process::exit(i),
-        Err(e) => {
-            writeln!(io::stderr(), "{}", e).expect("badness");
-            process::exit(1)
-        }
+        Err(_e) => process::exit(1),
     }
 }

@@ -7,15 +7,14 @@
 // modified, or distributed except according to those terms.
 
 //! `mussh` config.
-use clap::ArgMatches;
 use error::{ErrorKind, Result};
-use slog::{Drain, Level, LevelFilter, Logger};
+use slog::{Drain, Level, LevelFilter, Logger, Never, OwnedKVList, Record};
 use slog_async;
 use slog_term;
 use std::collections::HashMap;
 use std::env;
-use std::fs::File;
-use std::io::Read;
+use std::fs::{File, OpenOptions};
+use std::io::{Read, Write};
 use std::path::PathBuf;
 use toml;
 
@@ -24,22 +23,103 @@ pub const CONFIG_FILE_NAME: &'static str = "mussh.toml";
 /// Default 'dot' directory for `mussh` configuration.
 pub const DOT_DIR: &'static str = ".mussh";
 
-pub struct Logging {
+/// `mussh` Config
+#[derive(Clone)]
+pub struct Config {
+    /// Non-standard directory for the TOML config.
+    toml_dir: Option<PathBuf>,
+    /// Non-standard directory for logging output.
+    log_dir: Option<PathBuf>,
+    /// The command being multiplexed.
+    cmd: String,
+    /// The hosts to run the command on.
+    hosts: Vec<String>,
+    /// The TOML config.
+    toml: Option<MusshToml>,
     /// The slog stdout `Logger`.
     stdout: Logger,
     /// The slog stderr `Logger`.
-    #[allow(dead_code)]
     stderr: Logger,
 }
 
-impl Logging {
+impl Config {
+    /// Get the `toml_dir` value.
+    pub fn toml_dir(&self) -> Option<PathBuf> {
+        if let Some(ref pb) = self.toml_dir {
+            Some(pb.clone())
+        } else {
+            None
+        }
+    }
+
+    /// Set the `toml_dir` value.
+    pub fn set_toml_dir(&mut self, toml_dir: &str) -> &mut Config {
+        self.toml_dir = Some(PathBuf::from(toml_dir));
+        self
+    }
+
+    /// Get the `log_dir` value.
+    pub fn log_dir(&self) -> Option<PathBuf> {
+        if let Some(ref pb) = self.log_dir {
+            Some(pb.clone())
+        } else {
+            None
+        }
+    }
+
+    /// Set the `log_dir` value.
+    pub fn set_log_dir(&mut self, log_dir: &str) -> &mut Config {
+        self.log_dir = Some(PathBuf::from(log_dir));
+        self
+    }
+
+    /// Get the `cmd` value.
+    pub fn cmd(&self) -> &str {
+        &self.cmd
+    }
+
+    /// Set the `cmd` value.
+    pub fn set_cmd(&mut self, cmd: &str) -> &mut Config {
+        self.cmd = cmd.to_string();
+        self
+    }
+
+    /// Get the `hosts` value.
+    pub fn hosts(&self) -> Vec<&str> {
+        self.hosts
+            .iter()
+            .map(|x| &**x)
+            .collect()
+    }
+
+    /// Set the `hosts` value.
+    pub fn set_hosts(&mut self, hosts: Vec<&str>) -> &mut Config {
+        self.hosts = hosts.iter().map(|x| x.to_string()).collect();
+        self
+    }
+
+    /// Get the `toml` value.
+    pub fn toml(&self) -> Option<MusshToml> {
+        if let Some(ref toml) = self.toml {
+            Some(toml.clone())
+        } else {
+            None
+        }
+    }
+
+    /// Set the `toml` value.
+    pub fn set_toml(&mut self, toml: MusshToml) -> &mut Config {
+        self.toml = Some(toml);
+        self
+    }
+
     /// Get the `stdout` value.
     pub fn stdout(&self) -> Logger {
         self.stdout.clone()
     }
 
     /// Set the stdout slog 'Logger' level.
-    pub fn set_stdout_level(&mut self, level: Level) -> &mut Logging {
+    pub fn set_stdout_level(&mut self, level: Level) -> &mut Config {
         self.stdout = stdout_logger(level);
         self
     }
@@ -50,9 +130,14 @@ impl Logging {
     }
 }
 
-impl Default for Logging {
-    fn default() -> Logging {
-        Logging {
+impl Default for Config {
+    fn default() -> Config {
+        Config {
+            toml_dir: None,
+            log_dir: None,
+            cmd: String::new(),
+            hosts: Vec::new(),
+            toml: None,
             stdout: stdout_logger(Level::Error),
             stderr: stderr_logger(),
         }
@@ -136,8 +221,8 @@ pub struct Alias {
 
 impl MusshToml {
     /// Create a new 'MusshToml' from mussh.toml on the filesystem.
-    pub fn new(matches: &ArgMatches) -> Result<MusshToml> {
-        for path in &paths(matches.value_of("config")) {
+    pub fn new(toml_dir: Option<PathBuf>) -> Result<MusshToml> {
+        for path in &paths(toml_dir) {
             if let Ok(mut config_file) = File::open(path) {
                 let mut toml_buf = vec![];
                 if config_file.read_to_end(&mut toml_buf).is_ok() {
@@ -185,7 +270,7 @@ impl Hosts {
 
 impl Host {
     /// Get the `hostname` value.
-    pub fn hostname(&self) -> &String {
+    pub fn hostname(&self) -> &str {
         &self.hostname
     }
 
@@ -195,12 +280,12 @@ impl Host {
     }
 
     /// Get the `username` value.
-    pub fn username(&self) -> &String {
+    pub fn username(&self) -> &str {
         &self.username
     }
 
     /// Get the `pem` value.
-    pub fn pem(&self) -> Option<&String> {
+    pub fn pem(&self) -> Option<&str> {
         match self.pem {
             Some(ref p) => Some(p),
             None => None,
@@ -213,7 +298,7 @@ impl Host {
 
         if let Some(ref alias_vec) = self.alias {
             for alias in alias_vec {
-                aliases.insert(alias.aliasfor().clone(), alias.command().clone());
+                aliases.insert(alias.aliasfor().to_string(), alias.command().to_string());
             }
         }
 
@@ -227,29 +312,29 @@ impl Host {
 
 impl Command {
     /// Get the `command` value.
-    pub fn command(&self) -> &String {
+    pub fn command(&self) -> &str {
         &self.command
     }
 }
 
 impl Alias {
     /// Get the `command` value.
-    pub fn command(&self) -> &String {
+    pub fn command(&self) -> &str {
         &self.command
     }
 
     /// Get the `aliasfor` value.
-    pub fn aliasfor(&self) -> &String {
+    pub fn aliasfor(&self) -> &str {
         &self.aliasfor
     }
 }
 
 /// Generate a vector of paths to search for mussh.toml.
-fn paths(arg: Option<&str>) -> Vec<PathBuf> {
+fn paths(arg: Option<PathBuf>) -> Vec<PathBuf> {
     let mut paths = Vec::new();
 
     if let Some(dir) = arg {
-        paths.push(PathBuf::from(dir));
+        paths.push(dir);
     }
 
     if let Ok(mut cur_dir) = env::current_dir() {
@@ -286,4 +371,32 @@ fn add_system_path(paths: &mut Vec<PathBuf>) {
     appdata.push("mussh");
     appdata.push(CONFIG_FILE_NAME);
     paths.push(appdata);
+}
+
+
+#[derive(Debug)]
+pub struct FileDrain {
+    file: File
+}
+
+impl FileDrain {
+    pub fn new(path: PathBuf) -> Result<FileDrain> {
+        Ok(FileDrain {
+            file: OpenOptions::new().create(true).append(true).open(path)?
+        })
+    }
+}
+
+impl Drain for FileDrain {
+    type Ok = ();
+    type Err = Never;
+    fn log(&self, record: &Record, _: &OwnedKVList) -> ::std::result::Result<(), Never> {
+        if let Ok(mut log_file) = self.file.try_clone() {
+            match writeln!(log_file, "{}", record.msg()) {
+                Ok(()) => {}
+                Err(_e) => {}
+            }
+        }
+        Ok(())
+    }
 }

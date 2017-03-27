@@ -17,13 +17,29 @@ error_chain!{
             description("Could not find valid mussh.toml file!")
             display("Could not find valid mussh.toml file!")
         }
-        InvalidCmd(reason: String) {
-            description("Invalid command specified!")
-            display("Invalid command specified! {}", reason)
+        InvalidCmd {
+            description("'cmd' not configured properly in TOML!")
+            display("'cmd' not configured properly in TOML!")
+        }
+        InvalidHostList {
+            description("'hostlist' not configured properly in TOML!")
+            display("'hostlist' not configured properly in TOML!")
         }
         InvalidHosts {
-            description("Invalid hosts specified!")
-            display("Invalid hosts specified!")
+            description("'hosts' not configured properly in TOML!")
+            display("'hosts' not configured properly in TOML!")
+        }
+        InvalidToml {
+            description("Invalid TOML configuration!")
+            display("Invalid TOML configuration!")
+        }
+        NoValidHosts {
+            description("Could not determine any valid hosts!")
+            display("Could not determine any valid hosts!")
+        }
+        HostNotConfigured(host: String) {
+            description("host not configured!")
+            display("host {} not configured!", host)
         }
     }
 }
