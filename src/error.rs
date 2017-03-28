@@ -9,6 +9,7 @@
 //! `mussh` errors
 error_chain!{
     foreign_links {
+        Ssh2(::ssh2::Error);
         Io(::std::io::Error);
     }
 
@@ -40,6 +41,14 @@ error_chain!{
         HostNotConfigured(host: String) {
             description("host not configured!")
             display("host {} not configured!", host)
+        }
+        SshAuthentication {
+            description("ssh authentication failed!")
+            display("ssh authentication failed!")
+        }
+        SshSession {
+            description("invalid ssh session!")
+            display("invalid ssh session!")
         }
     }
 }

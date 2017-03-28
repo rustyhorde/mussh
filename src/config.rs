@@ -7,6 +7,7 @@
 // modified, or distributed except according to those terms.
 
 //! `mussh` config.
+use chrono::{DateTime, UTC};
 use error::{ErrorKind, Result};
 use slog::{Drain, Level, LevelFilter, Logger, Never, OwnedKVList, Record};
 use slog_async;
@@ -28,8 +29,6 @@ pub const DOT_DIR: &'static str = ".mussh";
 pub struct Config {
     /// Non-standard directory for the TOML config.
     toml_dir: Option<PathBuf>,
-    /// Non-standard directory for logging output.
-    log_dir: Option<PathBuf>,
     /// The command being multiplexed.
     cmd: String,
     /// The hosts to run the command on.
@@ -55,21 +54,6 @@ impl Config {
     /// Set the `toml_dir` value.
     pub fn set_toml_dir(&mut self, toml_dir: &str) -> &mut Config {
         self.toml_dir = Some(PathBuf::from(toml_dir));
-        self
-    }
-
-    /// Get the `log_dir` value.
-    pub fn log_dir(&self) -> Option<PathBuf> {
-        if let Some(ref pb) = self.log_dir {
-            Some(pb.clone())
-        } else {
-            None
-        }
-    }
-
-    /// Set the `log_dir` value.
-    pub fn set_log_dir(&mut self, log_dir: &str) -> &mut Config {
-        self.log_dir = Some(PathBuf::from(log_dir));
         self
     }
 
@@ -134,7 +118,6 @@ impl Default for Config {
     fn default() -> Config {
         Config {
             toml_dir: None,
-            log_dir: None,
             cmd: String::new(),
             hosts: Vec::new(),
             toml: None,
@@ -374,25 +357,32 @@ fn add_system_path(paths: &mut Vec<PathBuf>) {
 }
 
 
+/// A `slog` drain that writes to a file.
 #[derive(Debug)]
 pub struct FileDrain {
-    file: File
+    /// The file to drain log records to.
+    file: File,
 }
 
 impl FileDrain {
+    /// Create a new `FileDrain` that will write to a file at the given path.
     pub fn new(path: PathBuf) -> Result<FileDrain> {
         Ok(FileDrain {
-            file: OpenOptions::new().create(true).append(true).open(path)?
-        })
+               file: OpenOptions::new().create(true)
+                   .append(true)
+                   .open(path)?,
+           })
     }
 }
 
 impl Drain for FileDrain {
     type Ok = ();
     type Err = Never;
+
     fn log(&self, record: &Record, _: &OwnedKVList) -> ::std::result::Result<(), Never> {
         if let Ok(mut log_file) = self.file.try_clone() {
-            match writeln!(log_file, "{}", record.msg()) {
+            let utc: DateTime<UTC> = UTC::now();
+            match writeln!(log_file, "{}: {}", utc.to_rfc3339(), record.msg()) {
                 Ok(()) => {}
                 Err(_e) => {}
             }

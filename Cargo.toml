@@ -11,12 +11,14 @@ repository = "https://github.com/rustyhorde/mussh"
 version = "2.0.0"
 
 [dependencies]
+chrono = "0.3.0"
 clap = "2.22.1"
 error-chain = "0.10.0"
 serde = "0.9.11"
 serde_derive = "0.9.11"
 slog-async = "2.0.0-2.0"
 slog-term = "2.0.0-2.1"
+ssh2 = "0.3.1"
 toml = "0.3.1"
 
 [dependencies.slog]
