@@ -22,12 +22,14 @@ extern crate serde;
 extern crate slog_async;
 extern crate slog_term;
 extern crate ssh2;
+extern crate term;
 extern crate toml;
 
 mod cmd;
 mod config;
 mod error;
 mod run;
+mod util;
 
 use std::process;
 

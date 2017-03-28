@@ -19,6 +19,7 @@ serde_derive = "0.9.11"
 slog-async = "2.0.0-2.0"
 slog-term = "2.0.0-2.1"
 ssh2 = "0.3.1"
+term = "0.4.5"
 toml = "0.3.1"
 
 [dependencies.slog]

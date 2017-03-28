@@ -11,6 +11,7 @@ error_chain!{
     foreign_links {
         Ssh2(::ssh2::Error);
         Io(::std::io::Error);
+        Term(::term::Error);
     }
 
     errors {
@@ -49,6 +50,14 @@ error_chain!{
         SshSession {
             description("invalid ssh session!")
             display("invalid ssh session!")
+        }
+        SubCommand {
+            description("invalid sub-command!")
+            display("invalid sub-command!")
+        }
+        NoTerm {
+            description("unable to get vallid term!")
+            display("unable to get vallid term!")
         }
     }
 }

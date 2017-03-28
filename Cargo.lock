@@ -11,6 +11,7 @@ dependencies = [
  "slog-async 2.0.0-3.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "slog-term 2.0.0-3.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "ssh2 0.3.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "term 0.4.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "toml 0.3.1 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 

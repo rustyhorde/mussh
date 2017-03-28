@@ -8,15 +8,71 @@
 
 //! `host` sub-command.
 use clap::ArgMatches;
-use config::Config;
-use error::Result;
+use config::{self, Config, MusshToml};
+use error::{ErrorKind, Result};
 use slog::Logger;
+use std::{env, fs};
+use std::io::Write;
+use term;
+use util;
+
+/// Run the `host-list` sub-command.
+pub fn list_cmd(config: &mut Config,
+                _sub_m: &ArgMatches,
+                _stdout: &Logger,
+                stderr: &Logger)
+                -> Result<i32> {
+    // Create the dot dir if it doesn't exist.
+    if let Some(mut home_dir) = env::home_dir() {
+        home_dir.push(config::DOT_DIR);
+        if fs::metadata(&home_dir).is_err() || fs::create_dir_all(home_dir).is_err() {
+            error!(stderr, "cannot use/create the home directory!");
+            return Ok(1);
+        }
+    }
+
+    // Parse the toml.
+    let toml_dir = config.toml_dir();
+    match MusshToml::new(toml_dir) {
+        Ok(toml) => {
+            let mut t = term::stdout().ok_or_else(|| ErrorKind::NoTerm)?;
+
+            // List out the hosts
+            if let Some(hosts) = toml.hosts() {
+                let mut max = 0;
+                for k in hosts.keys() {
+                    let len = k.len();
+                    if len > max {
+                        max = len;
+                    }
+                }
+
+                for (k, v) in hosts {
+                    t.fg(term::color::GREEN)?;
+                    write!(t, "{}", util::pad_left(&k, max))?;
+                    t.reset()?;
+                    writeln!(t, ": {}", v)?;
+                }
+            }
+        }
+        Err(e) => {
+            error!(stderr, "{}", e);
+            return Err(e);
+        }
+    }
+
+    Ok(0)
+}
 
 /// Run the `host` sub-command.
-pub fn cmd(_config: &mut Config,
-           _sub_m: &ArgMatches,
-           _stdout: &Logger,
-           _stderr: &Logger)
+pub fn cmd(config: &mut Config,
+           sub_m: &ArgMatches,
+           stdout: &Logger,
+           stderr: &Logger)
            -> Result<i32> {
-    Ok(0)
+    match sub_m.subcommand() {
+        // 'host-list' subcommand
+        ("list", Some(sub_m)) => list_cmd(config, sub_m, stdout, stderr),
+        _ => Err(ErrorKind::SubCommand.into()),
+    }
 }

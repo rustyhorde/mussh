@@ -13,7 +13,7 @@ use slog::{Drain, Level, LevelFilter, Logger, Never, OwnedKVList, Record};
 use slog_async;
 use slog_term;
 use std::collections::HashMap;
-use std::env;
+use std::{env, fmt};
 use std::fs::{File, OpenOptions};
 use std::io::{Read, Write};
 use std::path::PathBuf;
@@ -291,6 +291,22 @@ impl Host {
         } else {
             Some(aliases)
         }
+    }
+}
+
+impl fmt::Display for Host {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let pem = if let Some(ref pem) = self.pem {
+            pem.clone()
+        } else {
+            "".to_string()
+        };
+        write!(f,
+               "{}@{}:{} {}",
+               self.username,
+               self.hostname,
+               self.port.unwrap_or(22),
+               pem)
     }
 }
 
