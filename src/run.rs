@@ -141,7 +141,7 @@ fn execute(logs: (&Logger, &Logger),
     let file_logger = Logger::root(async_file_drain, o!());
     let timer = Instant::now();
 
-    if hostname == "localhost" {
+    if host == "lh" {
         let mut cmd = Command::new("/usr/bin/fish");
         cmd.arg("-c");
         cmd.arg(command);
@@ -158,9 +158,19 @@ fn execute(logs: (&Logger, &Logger),
 
             let status = child.wait()?;
             if status.success() {
-                info!(stdout, "execute"; "duration" => timer.elapsed().as_secs());
+                info!(
+                    stdout,
+                    "execute";
+                    "host" => host,
+                    "duration" => timer.elapsed().as_secs()
+                );
             } else {
-                error!(stderr, "execute"; "duration" => timer.elapsed().as_secs());
+                error!(
+                    stderr,
+                    "execute";
+                    "host" => host,
+                    "duration" => timer.elapsed().as_secs()
+                );
             }
         }
     } else if let Some(mut sess) = Session::new() {
