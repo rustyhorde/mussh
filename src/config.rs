@@ -70,10 +70,7 @@ impl Config {
 
     /// Get the `hosts` value.
     pub fn hosts(&self) -> Vec<&str> {
-        self.hosts
-            .iter()
-            .map(|x| &**x)
-            .collect()
+        self.hosts.iter().map(|x| &**x).collect()
     }
 
     /// Set the `hosts` value.
@@ -130,7 +127,9 @@ impl Default for Config {
 /// Setup the stderr slog `Logger`
 fn stderr_logger() -> Logger {
     let stderr_decorator = slog_term::TermDecorator::new().stderr().build();
-    let stderr_drain = slog_term::CompactFormat::new(stderr_decorator).build().fuse();
+    let stderr_drain = slog_term::CompactFormat::new(stderr_decorator)
+        .build()
+        .fuse();
     let stderr_async_drain = slog_async::Async::new(stderr_drain).build().fuse();
     let stderr_level_drain = LevelFilter::new(stderr_async_drain, Level::Error).fuse();
     Logger::root(stderr_level_drain,
@@ -143,7 +142,9 @@ fn stderr_logger() -> Logger {
 /// Setup the stdout slog `Logger`
 fn stdout_logger(level: Level) -> Logger {
     let stdout_decorator = slog_term::TermDecorator::new().stdout().build();
-    let stdout_drain = slog_term::CompactFormat::new(stdout_decorator).build().fuse();
+    let stdout_drain = slog_term::CompactFormat::new(stdout_decorator)
+        .build()
+        .fuse();
     let stdout_async_drain = slog_async::Async::new(stdout_drain).build().fuse();
     let stdout_level_drain = LevelFilter::new(stdout_async_drain, level).fuse();
     Logger::root(stdout_level_drain,

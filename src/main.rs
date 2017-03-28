@@ -24,6 +24,7 @@ extern crate slog_term;
 extern crate ssh2;
 extern crate toml;
 
+mod cmd;
 mod config;
 mod error;
 mod run;
