@@ -78,11 +78,11 @@ pub fn run() -> Result<i32> {
 
     match matches.subcommand() {
         // 'cmd' subcommand
-        ("cmd", Some(sub_m)) => command::cmd(&mut config, sub_m, &stdout, &stderr),
+        ("cmd", Some(sub_m)) => command::cmd(&mut config, sub_m, &stderr),
         // 'hostlist' subcommand
-        ("hostlist", Some(sub_m)) => hostlist::cmd(&mut config, sub_m, &stdout, &stderr),
+        ("hostlist", Some(sub_m)) => hostlist::cmd(&mut config, sub_m, &stderr),
         // 'hosts' subcommand
-        ("hosts", Some(sub_m)) => hosts::cmd(&mut config, sub_m, &stdout, &stderr),
+        ("hosts", Some(sub_m)) => hosts::cmd(&mut config, sub_m, &stderr),
         // 'run' subcommand
         ("run", Some(sub_m)) => run::cmd(&mut config, sub_m, &stdout, &stderr),
         (cmd, _) => {

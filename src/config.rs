@@ -309,17 +309,34 @@ impl Host {
 
 impl fmt::Display for Host {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let pem = if let Some(ref pem) = self.pem {
-            pem.clone()
-        } else {
-            "".to_string()
-        };
+        let mut pem_str = String::new();
+        if let Some(ref pem) = self.pem {
+            pem_str.push(' ');
+            pem_str.push_str(pem);
+        }
+
+        let mut aliases = String::new();
+        if let Some(ref alias_vec) = self.alias {
+            let len = alias_vec.len();
+            for (idx, alias) in alias_vec.iter().enumerate() {
+                if idx == 0 {
+                    aliases.push_str(" { ");
+                }
+                if idx < len - 1 {
+                    aliases.push_str(&format!("{}: {}, ", alias.aliasfor(), alias.command()));
+                } else {
+                    aliases.push_str(&format!("{}: {} }}", alias.aliasfor(), alias.command()));
+                }
+            }
+        }
+
         write!(f,
-               "{}@{}:{} {}",
+               "{}@{}:{}{}{}",
                self.username,
                self.hostname,
                self.port.unwrap_or(22),
-               pem)
+               pem_str,
+               aliases)
     }
 }
 

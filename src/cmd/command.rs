@@ -8,30 +8,16 @@
 
 //! `host` sub-command.
 use clap::ArgMatches;
-use config::{self, Config, MusshToml};
+use config::{Config, MusshToml};
 use error::{ErrorKind, Result};
 use slog::Logger;
-use std::{env, fs};
 use std::collections::BTreeMap;
 use std::io::Write;
 use term;
 use util;
 
 /// Run the `host-list` sub-command.
-pub fn list_cmd(config: &mut Config,
-                _sub_m: &ArgMatches,
-                _stdout: &Logger,
-                stderr: &Logger)
-                -> Result<i32> {
-    // Create the dot dir if it doesn't exist.
-    if let Some(mut home_dir) = env::home_dir() {
-        home_dir.push(config::DOT_DIR);
-        if fs::metadata(&home_dir).is_err() || fs::create_dir_all(home_dir).is_err() {
-            error!(stderr, "cannot use/create the home directory!");
-            return Ok(1);
-        }
-    }
-
+pub fn list_cmd(config: &mut Config, stderr: &Logger) -> Result<i32> {
     // Parse the toml.
     let toml_dir = config.toml_dir();
     match MusshToml::new(toml_dir) {
@@ -40,11 +26,11 @@ pub fn list_cmd(config: &mut Config,
 
             // List out the hostlists
             if let Some(cmd) = toml.cmd() {
-                let mut max = 0;
+                let mut max_k = 0;
                 for k in cmd.keys() {
-                    let len = k.len();
-                    if len > max {
-                        max = len;
+                    let len_k = k.len();
+                    if len_k > max_k {
+                        max_k = len_k;
                     }
                 }
 
@@ -56,9 +42,24 @@ pub fn list_cmd(config: &mut Config,
 
                 for (k, v) in bmap {
                     t.fg(term::color::GREEN)?;
-                    write!(t, "{}", util::pad_left(&k, max))?;
+                    t.attr(term::Attr::Bold)?;
+                    write!(t, "  {}", util::pad_left(&k, max_k))?;
                     t.reset()?;
-                    writeln!(t, ": {}", v)?;
+                    let sub_cmds = v.command().split(';');
+
+                    for (idx, sub_cmd) in sub_cmds.enumerate() {
+                        if idx == 0 {
+                            writeln!(t, "  {}", sub_cmd)?;
+                        } else {
+                            let mut padded = String::new();
+                            for _ in 0..(max_k + 4) {
+                                padded.push(' ');
+                            }
+                            padded.push_str(sub_cmd.trim());
+                            writeln!(t, "{}", padded)?;
+                        }
+                    }
+                    t.flush()?;
                 }
             }
         }
@@ -72,14 +73,10 @@ pub fn list_cmd(config: &mut Config,
 }
 
 /// Run the `host` sub-command.
-pub fn cmd(config: &mut Config,
-           sub_m: &ArgMatches,
-           stdout: &Logger,
-           stderr: &Logger)
-           -> Result<i32> {
+pub fn cmd(config: &mut Config, sub_m: &ArgMatches, stderr: &Logger) -> Result<i32> {
     match sub_m.subcommand() {
         // 'hostlist-list' subcommand
-        ("list", Some(sub_m)) => list_cmd(config, sub_m, stdout, stderr),
+        ("list", Some(_)) => list_cmd(config, stderr),
         _ => Err(ErrorKind::SubCommand.into()),
     }
 }
