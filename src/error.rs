@@ -12,6 +12,8 @@ error_chain!{
         Ssh2(::ssh2::Error);
         Io(::std::io::Error);
         Term(::term::Error);
+        TomlSe(::toml::ser::Error);
+        ParseInt(::std::num::ParseIntError);
     }
 
     errors {

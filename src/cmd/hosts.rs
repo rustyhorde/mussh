@@ -8,16 +8,18 @@
 
 //! `host` sub-command.
 use clap::ArgMatches;
-use config::{Config, MusshToml};
+use config::{Config, Host, MusshToml};
 use error::{ErrorKind, Result};
-use slog::Logger;
 use std::collections::BTreeMap;
+use std::fs::OpenOptions;
 use std::io::Write;
+use std::str::FromStr;
 use term;
+use toml;
 use util;
 
 /// Run the `host-list` sub-command.
-pub fn list_cmd(config: &mut Config, stderr: &Logger) -> Result<i32> {
+pub fn list_cmd(config: &mut Config) -> Result<i32> {
     // Parse the toml.
     let toml_dir = config.toml_dir();
     match MusshToml::new(toml_dir) {
@@ -51,7 +53,7 @@ pub fn list_cmd(config: &mut Config, stderr: &Logger) -> Result<i32> {
             }
         }
         Err(e) => {
-            error!(stderr, "{}", e);
+            error!(config.stderr(), "{}", e);
             return Err(e);
         }
     }
@@ -59,11 +61,45 @@ pub fn list_cmd(config: &mut Config, stderr: &Logger) -> Result<i32> {
     Ok(0)
 }
 
+/// Run the `hosts-add` sub-command.
+pub fn add_cmd(config: &mut Config, add_m: &ArgMatches) -> Result<i32> {
+    let mut host: Host = Default::default();
+
+    if let Some(username) = add_m.value_of("username") {
+        host.set_username(username);
+    }
+
+    if let Some(hostname) = add_m.value_of("hostname") {
+        host.set_hostname(hostname);
+    }
+
+    if let Some(port) = add_m.value_of("port") {
+        let p = u16::from_str(port)?;
+        host.set_port(p);
+    }
+
+    // Parse the toml.
+    let mut toml = match MusshToml::new(config.toml_dir()) {
+        Ok(toml) => toml,
+        Err(_) => Default::default(),
+    };
+
+    let mut toml_file = OpenOptions::new().create(true)
+        .write(true)
+        .open("/home/jozias/projects/mussh/mussh.new.toml")?;
+
+    toml.add_host("test", host);
+    toml_file.write_all(&toml::to_vec(&toml)?)?;
+
+    Ok(0)
+}
+
 /// Run the `host` sub-command.
-pub fn cmd(config: &mut Config, sub_m: &ArgMatches, stderr: &Logger) -> Result<i32> {
+pub fn cmd(config: &mut Config, sub_m: &ArgMatches) -> Result<i32> {
     match sub_m.subcommand() {
         // 'host-list' subcommand
-        ("list", Some(_)) => list_cmd(config, stderr),
+        ("list", Some(_)) => list_cmd(config),
+        ("add", Some(add_m)) => add_cmd(config, add_m),
         _ => Err(ErrorKind::SubCommand.into()),
     }
 }

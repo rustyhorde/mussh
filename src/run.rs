@@ -44,7 +44,28 @@ pub fn run() -> Result<i32> {
         .subcommand(SubCommand::with_name("hosts")
                                .about("Work with 'hosts' configuration")
                                .subcommand(SubCommand::with_name("list")
-                                                      .about("List the 'hosts' configuration")))
+                                                      .about("List the 'hosts' configuration"))
+                               .subcommand(SubCommand::with_name("add")
+                                                      .about("Add 'hosts' configuration")
+                                                      .arg(Arg::with_name("username")
+                                                               .value_name("USERNAME")
+                                                               .help("The username")
+                                                               .index(1)
+                                                               .required(true))
+                                                      .arg(Arg::with_name("hostname")
+                                                               .value_name("HOSTNAME")
+                                                               .help("The hostname/ip address")
+                                                               .index(2)
+                                                               .required(true))
+                                                      .arg(Arg::with_name("port")
+                                                               .value_name("PORT")
+                                                               .help("The port")
+                                                               .index(3)
+                                                               .required(true))
+                                                      .arg(Arg::with_name("pem")
+                                                               .value_name("PEM")
+                                                               .help("A pem file path")
+                                                               .index(4))))
         .subcommand(SubCommand::with_name("run")
                                .about("Run a command on hosts")
                                .arg(Arg::with_name("dry_run")
@@ -82,7 +103,7 @@ pub fn run() -> Result<i32> {
         // 'hostlist' subcommand
         ("hostlist", Some(sub_m)) => hostlist::cmd(&mut config, sub_m, &stderr),
         // 'hosts' subcommand
-        ("hosts", Some(sub_m)) => hosts::cmd(&mut config, sub_m, &stderr),
+        ("hosts", Some(sub_m)) => hosts::cmd(&mut config, sub_m),
         // 'run' subcommand
         ("run", Some(sub_m)) => run::cmd(&mut config, sub_m, &stdout, &stderr),
         (cmd, _) => {

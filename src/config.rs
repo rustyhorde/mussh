@@ -154,7 +154,7 @@ fn stdout_logger(level: Level) -> Logger {
     ))
 }
 
-#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq)]
+#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
 /// The base configuration.
 pub struct MusshToml {
     /// A list of hosts.
@@ -165,14 +165,14 @@ pub struct MusshToml {
     cmd: Option<HashMap<String, Command>>,
 }
 
-#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq)]
+#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
 /// hosts configuration
 pub struct Hosts {
     /// The hostnames.
     hostnames: Vec<String>,
 }
 
-#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq)]
+#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
 /// Host configuration.
 pub struct Host {
     /// A hostname.
@@ -187,14 +187,14 @@ pub struct Host {
     alias: Option<Vec<Alias>>,
 }
 
-#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq)]
+#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
 /// command configuration
 pub struct Command {
     /// A Command.
     command: String,
 }
 
-#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq)]
+#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
 /// command alias configuration.
 pub struct Alias {
     /// A command alias.
@@ -236,6 +236,18 @@ impl MusshToml {
         }
     }
 
+    /// Add a `hosts` value.
+    pub fn add_host(&mut self, k: &str, v: Host) -> &mut MusshToml {
+        if let Some(ref mut hosts) = self.hosts {
+            hosts.insert(k.to_string(), v);
+        } else {
+            let mut new_hosts = HashMap::new();
+            new_hosts.insert(k.to_string(), v);
+            self.hosts = Some(new_hosts);
+        }
+        self
+    }
+
     /// Get the `cmd` value.
     pub fn cmd(&self) -> Option<&HashMap<String, Command>> {
         match self.cmd {
@@ -271,14 +283,32 @@ impl Host {
         &self.hostname
     }
 
+    /// Set the `hostname` value.
+    pub fn set_hostname(&mut self, hostname: &str) -> &mut Host {
+        self.hostname = hostname.to_string();
+        self
+    }
+
     /// Get the `port` value.
     pub fn port(&self) -> Option<u16> {
         self.port
     }
 
+    /// Set the `port` value.
+    pub fn set_port(&mut self, port: u16) -> &mut Host {
+        self.port = Some(port);
+        self
+    }
+
     /// Get the `username` value.
     pub fn username(&self) -> &str {
         &self.username
+    }
+
+    /// Set the `username` value.
+    pub fn set_username(&mut self, username: &str) -> &mut Host {
+        self.username = username.to_string();
+        self
     }
 
     /// Get the `pem` value.

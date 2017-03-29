@@ -8,6 +8,7 @@
 
 //! mussh - SSH Multiplexing
 #![cfg_attr(feature="cargo-clippy", allow(unseparated_literal_suffix))]
+#![recursion_limit="128"]
 #![deny(missing_docs)]
 #[macro_use]
 extern crate error_chain;
@@ -31,12 +32,16 @@ mod error;
 mod run;
 mod util;
 
+use std::io::{self, Write};
 use std::process;
 
 /// mussh entry point
 fn main() {
     match run::run() {
         Ok(i) => process::exit(i),
-        Err(_e) => process::exit(1),
+        Err(e) => {
+            writeln!(io::stderr(), "{}", e).expect("badness");
+            process::exit(1)
+        },
     }
 }
