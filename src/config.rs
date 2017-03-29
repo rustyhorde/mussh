@@ -252,6 +252,19 @@ impl Hosts {
     }
 }
 
+impl fmt::Display for Hosts {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let len = self.hostnames.len();
+        for (idx, host) in self.hostnames.iter().enumerate() {
+            write!(f, "{}", host)?;
+            if idx < len - 1 {
+                write!(f, ", ")?;
+            }
+        }
+        Ok(())
+    }
+}
+
 impl Host {
     /// Get the `hostname` value.
     pub fn hostname(&self) -> &str {
@@ -314,6 +327,12 @@ impl Command {
     /// Get the `command` value.
     pub fn command(&self) -> &str {
         &self.command
+    }
+}
+
+impl fmt::Display for Command {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", self.command)
     }
 }
 

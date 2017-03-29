@@ -10,5 +10,6 @@ pub fn pad_left(s: &str, max: usize) -> String {
         len += 1;
     }
 
+    res.push_str(s);
     res
 }
