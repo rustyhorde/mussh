@@ -246,6 +246,12 @@ impl MusshToml {
         &self.hostlist
     }
 
+    /// Add a `hostlist` value.
+    pub fn add_hostlist(&mut self, k: &str, v: Hosts) -> &mut MusshToml {
+        self.hostlist.insert(k.to_string(), v);
+        self
+    }
+
     /// Get the `hosts` value.
     pub fn hosts(&self) -> &BTreeMap<String, Host> {
         &self.hosts
@@ -273,6 +279,12 @@ impl Hosts {
     /// Get the `hostnames` value.
     pub fn hostnames(&self) -> &Vec<String> {
         &self.hostnames
+    }
+
+    /// Set the `hostnames` value.
+    pub fn set_hostnames(&mut self, hostnames: Vec<String>) -> &mut Hosts {
+        self.hostnames = hostnames;
+        self
     }
 }
 
