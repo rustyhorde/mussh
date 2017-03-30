@@ -250,6 +250,7 @@ fn multiplex(config: &Config) -> Result<()> {
     let count = hostnames.len();
     let base_cmd = setup_command(config)?;
     let (tx, rx) = mpsc::channel();
+    let mut errors = Vec::new();
 
     for host in hostnames {
         let stdout = config.stdout();
@@ -271,13 +272,21 @@ fn multiplex(config: &Config) -> Result<()> {
                               pem))
                 .expect("badness");
         });
+
+        if config.sync() {
+            match rx.recv() {
+                Ok(_) => {}
+                Err(e) => errors.push(e),
+            }
+        }
     }
 
-    let mut errors = Vec::new();
-    for _ in 0..count {
-        match rx.recv() {
-            Ok(_) => {}
-            Err(e) => errors.push(e),
+    if !config.sync() {
+        for _ in 0..count {
+            match rx.recv() {
+                Ok(_) => {}
+                Err(e) => errors.push(e),
+            }
         }
     }
     Ok(())
@@ -291,6 +300,10 @@ pub fn cmd(config: &mut Config,
            -> Result<i32> {
     if let Some(cmd) = sub_m.value_of("command") {
         config.set_cmd(cmd);
+    }
+
+    if sub_m.is_present("sync") {
+        config.set_sync(true);
     }
 
     if let Some(hosts_iter) = sub_m.values_of("hosts") {

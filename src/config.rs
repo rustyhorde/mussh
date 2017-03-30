@@ -35,6 +35,8 @@ pub struct Config {
     hosts: Vec<String>,
     /// The TOML config.
     toml: Option<MusshToml>,
+    /// Should the commands be run synchronously?
+    sync: bool,
     /// The slog stdout `Logger`.
     stdout: Logger,
     /// The slog stderr `Logger`.
@@ -94,6 +96,17 @@ impl Config {
         self
     }
 
+    /// Get the `sync` value.
+    pub fn sync(&self) -> bool {
+        self.sync
+    }
+
+    /// Set the `sync` value.
+    pub fn set_sync(&mut self, sync: bool) -> &mut Config {
+        self.sync = sync;
+        self
+    }
+
     /// Get the `stdout` value.
     pub fn stdout(&self) -> Logger {
         self.stdout.clone()
@@ -118,6 +131,7 @@ impl Default for Config {
             cmd: String::new(),
             hosts: Vec::new(),
             toml: None,
+            sync: false,
             stdout: stdout_logger(Level::Error),
             stderr: stderr_logger(),
         }

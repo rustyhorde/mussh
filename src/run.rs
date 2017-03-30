@@ -114,6 +114,11 @@ pub fn run() -> Result<i32> {
                                         .long("dryrun")
                                         .help("Parse config and setup the client, \
                                         but don't run it."))
+                               .arg(Arg::with_name("sync")
+                                        .short("s")
+                                        .long("sync")
+                                        .help("Run the given commadn synchronously across the \
+                                        hosts."))
                                .arg(Arg::with_name("command")
                                         .value_name("CMD")
                                         .help("The command to multiplex")
