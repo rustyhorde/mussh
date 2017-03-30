@@ -12,7 +12,7 @@ use error::{ErrorKind, Result};
 use slog::{Drain, Level, LevelFilter, Logger, Never, OwnedKVList, Record};
 use slog_async;
 use slog_term;
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 use std::{env, fmt};
 use std::fs::{File, OpenOptions};
 use std::io::{Read, Write};
@@ -158,11 +158,14 @@ fn stdout_logger(level: Level) -> Logger {
 /// The base configuration.
 pub struct MusshToml {
     /// A list of hosts.
-    hostlist: Option<HashMap<String, Hosts>>,
+    #[serde(serialize_with = "toml::ser::tables_last")]
+    hostlist: BTreeMap<String, Hosts>,
     /// The hosts.
-    hosts: Option<HashMap<String, Host>>,
+    #[serde(serialize_with = "toml::ser::tables_last")]
+    hosts: BTreeMap<String, Host>,
     /// A command.
-    cmd: Option<HashMap<String, Command>>,
+    #[serde(serialize_with = "toml::ser::tables_last")]
+    cmd: BTreeMap<String, Command>,
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
@@ -205,13 +208,17 @@ pub struct Alias {
 
 impl MusshToml {
     /// Create a new 'MusshToml' from mussh.toml on the filesystem.
-    pub fn new(toml_dir: Option<PathBuf>) -> Result<MusshToml> {
+    pub fn new(config: &mut Config) -> Result<MusshToml> {
+        let toml_dir = config.toml_dir();
         for path in &paths(toml_dir) {
             if let Ok(mut config_file) = File::open(path) {
                 let mut toml_buf = vec![];
                 if config_file.read_to_end(&mut toml_buf).is_ok() {
                     let toml_str = String::from_utf8_lossy(&toml_buf);
                     if let Ok(parsed) = toml::from_str(&toml_str) {
+                        if let Some(td) = path.as_path().to_str() {
+                            config.set_toml_dir(td);
+                        }
                         return Ok(parsed);
                     }
                 }
@@ -221,39 +228,24 @@ impl MusshToml {
     }
 
     /// Get the `hostlist` value.
-    pub fn hostlist(&self) -> Option<&HashMap<String, Hosts>> {
-        match self.hostlist {
-            Some(ref h) => Some(h),
-            None => None,
-        }
+    pub fn hostlist(&self) -> &BTreeMap<String, Hosts> {
+        &self.hostlist
     }
 
     /// Get the `hosts` value.
-    pub fn hosts(&self) -> Option<&HashMap<String, Host>> {
-        match self.hosts {
-            Some(ref h) => Some(h),
-            None => None,
-        }
+    pub fn hosts(&self) -> &BTreeMap<String, Host> {
+        &self.hosts
     }
 
     /// Add a `hosts` value.
     pub fn add_host(&mut self, k: &str, v: Host) -> &mut MusshToml {
-        if let Some(ref mut hosts) = self.hosts {
-            hosts.insert(k.to_string(), v);
-        } else {
-            let mut new_hosts = HashMap::new();
-            new_hosts.insert(k.to_string(), v);
-            self.hosts = Some(new_hosts);
-        }
+        self.hosts.insert(k.to_string(), v);
         self
     }
 
     /// Get the `cmd` value.
-    pub fn cmd(&self) -> Option<&HashMap<String, Command>> {
-        match self.cmd {
-            Some(ref c) => Some(c),
-            None => None,
-        }
+    pub fn cmd(&self) -> &BTreeMap<String, Command> {
+        &self.cmd
     }
 }
 
@@ -319,9 +311,15 @@ impl Host {
         }
     }
 
+    /// Set the `pem` value.
+    pub fn set_pem(&mut self, pem: &str) -> &mut Host {
+        self.pem = Some(pem.to_string());
+        self
+    }
+
     /// Get the `alias` value.
-    pub fn alias(&self) -> Option<HashMap<String, String>> {
-        let mut aliases = HashMap::new();
+    pub fn alias(&self) -> Option<BTreeMap<String, String>> {
+        let mut aliases = BTreeMap::new();
 
         if let Some(ref alias_vec) = self.alias {
             for alias in alias_vec {

@@ -10,8 +10,7 @@
 use clap::ArgMatches;
 use config::{Config, Host, MusshToml};
 use error::{ErrorKind, Result};
-use std::collections::BTreeMap;
-use std::fs::OpenOptions;
+use std::fs::{self, OpenOptions};
 use std::io::Write;
 use std::str::FromStr;
 use term;
@@ -21,35 +20,27 @@ use util;
 /// Run the `host-list` sub-command.
 pub fn list_cmd(config: &mut Config) -> Result<i32> {
     // Parse the toml.
-    let toml_dir = config.toml_dir();
-    match MusshToml::new(toml_dir) {
+    match MusshToml::new(config) {
         Ok(toml) => {
             let mut t = term::stdout().ok_or_else(|| ErrorKind::NoTerm)?;
 
             // List out the hosts
-            if let Some(hosts) = toml.hosts() {
-                let mut max_k = 0;
-                for k in hosts.keys() {
-                    let len_k = k.len();
-                    if len_k > max_k {
-                        max_k = len_k;
-                    }
+            let hosts = toml.hosts();
+            let mut max_k = 0;
+            for k in hosts.keys() {
+                let len_k = k.len();
+                if len_k > max_k {
+                    max_k = len_k;
                 }
+            }
 
-                // For sorting
-                let mut bmap = BTreeMap::new();
-                for (k, v) in hosts {
-                    bmap.insert(k, v);
-                }
-
-                for (k, v) in bmap {
-                    t.fg(term::color::GREEN)?;
-                    t.attr(term::Attr::Bold)?;
-                    write!(t, "  {}", util::pad_left(&k, max_k))?;
-                    t.reset()?;
-                    writeln!(t, "  {}", v)?;
-                    t.flush()?;
-                }
+            for (k, v) in hosts {
+                t.fg(term::color::GREEN)?;
+                t.attr(term::Attr::Bold)?;
+                write!(t, "  {}", util::pad_left(&k, max_k))?;
+                t.reset()?;
+                writeln!(t, "  {}", v)?;
+                t.flush()?;
             }
         }
         Err(e) => {
@@ -78,20 +69,33 @@ pub fn add_cmd(config: &mut Config, add_m: &ArgMatches) -> Result<i32> {
         host.set_port(p);
     }
 
+    if let Some(pem) = add_m.value_of("pem") {
+        host.set_pem(pem);
+    }
+
     // Parse the toml.
-    let mut toml = match MusshToml::new(config.toml_dir()) {
+    let mut toml = match MusshToml::new(config) {
         Ok(toml) => toml,
         Err(_) => Default::default(),
     };
 
-    let mut toml_file = OpenOptions::new().create(true)
-        .write(true)
-        .open("/home/jozias/projects/mussh/mussh.new.toml")?;
+    if let Some(ref pb) = config.toml_dir() {
+        let mut bk_p = pb.clone();
+        bk_p.pop();
+        bk_p.push("mussh.toml.bk");
+        fs::copy(pb, bk_p)?;
+        let mut toml_file = OpenOptions::new().create(true)
+            .truncate(true)
+            .write(true)
+            .open(pb)?;
 
-    toml.add_host("test", host);
-    toml_file.write_all(&toml::to_vec(&toml)?)?;
-
-    Ok(0)
+        toml.add_host("test", host);
+        toml_file.write_all(&toml::to_vec(&toml)?)?;
+        Ok(0)
+    } else {
+        error!(config.stderr(), "Unable to determine TOML file path!");
+        Err(ErrorKind::Config.into())
+    }
 }
 
 /// Run the `host` sub-command.

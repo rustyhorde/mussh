@@ -25,14 +25,14 @@ error_chain!{
             description("'cmd' not configured properly in TOML!")
             display("'cmd' not configured properly in TOML!")
         }
-        InvalidHostList {
-            description("'hostlist' not configured properly in TOML!")
-            display("'hostlist' not configured properly in TOML!")
-        }
-        InvalidHosts {
-            description("'hosts' not configured properly in TOML!")
-            display("'hosts' not configured properly in TOML!")
-        }
+        // InvalidHostList {
+        //     description("'hostlist' not configured properly in TOML!")
+        //     display("'hostlist' not configured properly in TOML!")
+        // }
+        // InvalidHosts {
+        //     description("'hosts' not configured properly in TOML!")
+        //     display("'hosts' not configured properly in TOML!")
+        // }
         InvalidToml {
             description("Invalid TOML configuration!")
             display("Invalid TOML configuration!")

@@ -11,7 +11,6 @@ use clap::ArgMatches;
 use config::{Config, MusshToml};
 use error::{ErrorKind, Result};
 use slog::Logger;
-use std::collections::BTreeMap;
 use std::io::Write;
 use term;
 use util;
@@ -19,35 +18,27 @@ use util;
 /// Run the `host-list` sub-command.
 pub fn list_cmd(config: &mut Config, stderr: &Logger) -> Result<i32> {
     // Parse the toml.
-    let toml_dir = config.toml_dir();
-    match MusshToml::new(toml_dir) {
+    match MusshToml::new(config) {
         Ok(toml) => {
             let mut t = term::stdout().ok_or_else(|| ErrorKind::NoTerm)?;
 
             // List out the hostlists
-            if let Some(hostlist) = toml.hostlist() {
-                let mut max_k = 0;
-                for k in hostlist.keys() {
-                    let len_k = k.len();
-                    if len_k > max_k {
-                        max_k = len_k;
-                    }
+            let hostlist = toml.hostlist();
+            let mut max_k = 0;
+            for k in hostlist.keys() {
+                let len_k = k.len();
+                if len_k > max_k {
+                    max_k = len_k;
                 }
+            }
 
-                // For sorting
-                let mut bmap = BTreeMap::new();
-                for (k, v) in hostlist {
-                    bmap.insert(k, v);
-                }
-
-                for (k, v) in bmap {
-                    t.fg(term::color::GREEN)?;
-                    t.attr(term::Attr::Bold)?;
-                    write!(t, "  {}", util::pad_left(&k, max_k))?;
-                    t.reset()?;
-                    writeln!(t, "  {}", v)?;
-                    t.flush()?;
-                }
+            for (k, v) in hostlist {
+                t.fg(term::color::GREEN)?;
+                t.attr(term::Attr::Bold)?;
+                write!(t, "  {}", util::pad_left(&k, max_k))?;
+                t.reset()?;
+                writeln!(t, "  {}", v)?;
+                t.flush()?;
             }
         }
         Err(e) => {

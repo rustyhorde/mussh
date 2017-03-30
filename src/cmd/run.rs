@@ -13,7 +13,7 @@ use error::{ErrorKind, Result};
 use slog::{Drain, Logger};
 use slog_async;
 use ssh2::Session;
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 use std::{env, fs, thread};
 use std::io::{BufRead, BufReader};
 use std::net::TcpStream;
@@ -27,8 +27,7 @@ fn setup_hostnames(config: &Config) -> Result<Vec<String>> {
     let stdout = config.stdout();
     let mut hostnames = Vec::new();
     let toml = config.toml().ok_or_else(|| ErrorKind::InvalidToml)?;
-    let hosts = toml.hostlist()
-        .ok_or_else(|| ErrorKind::InvalidHostList)?;
+    let hosts = toml.hostlist();
     let mut tmp_hns = Vec::new();
     for host in &config.hosts() {
         if let Some(hn) = hosts.get(&host.to_string()) {
@@ -39,7 +38,7 @@ fn setup_hostnames(config: &Config) -> Result<Vec<String>> {
     for host in &config.hosts() {
         if host.starts_with('!') {
             let (_, hn) = (*host).split_at(1);
-            warn!(stdout, "setupt_hostnames"; "removing host" => hn);
+            warn!(stdout, "setup_hostnames"; "removing host" => hn);
             tmp_hns = tmp_hns.iter().filter(|x| *x != hn).cloned().collect();
         }
     }
@@ -62,7 +61,7 @@ fn setup_command(config: &Config) -> Result<String> {
     let stdout = config.stdout();
     let mut cmd = String::new();
     let toml = config.toml().ok_or_else(|| ErrorKind::InvalidToml)?;
-    let cmds = toml.cmd().ok_or_else(|| ErrorKind::InvalidCmd)?;
+    let cmds = toml.cmd();
     for (name, command) in cmds {
         if name == config.cmd() {
             cmd.push_str(command.command());
@@ -79,12 +78,12 @@ fn setup_command(config: &Config) -> Result<String> {
 }
 
 /// Host Configuration tuple.
-type ConfigTuple = (String, String, u16, Option<String>, Option<HashMap<String, String>>);
+type ConfigTuple = (String, String, u16, Option<String>, Option<BTreeMap<String, String>>);
 
 /// Setup a host given a hostname.
 fn setup_host(config: &Config, hostname: &str) -> Result<ConfigTuple> {
     let toml = config.toml().ok_or_else(|| ErrorKind::InvalidToml)?;
-    let hosts = toml.hosts().ok_or_else(|| ErrorKind::InvalidHosts)?;
+    let hosts = toml.hosts();
     let host = hosts.get(hostname)
         .ok_or_else(|| ErrorKind::HostNotConfigured(hostname.to_string()))?;
     let username = host.username();
@@ -104,12 +103,12 @@ fn setup_host(config: &Config, hostname: &str) -> Result<ConfigTuple> {
 }
 
 /// Setup the command aliases.
-fn setup_alias(config: &Config, alias: Option<HashMap<String, String>>) -> Result<String> {
+fn setup_alias(config: &Config, alias: Option<BTreeMap<String, String>>) -> Result<String> {
     let alias_map = alias.ok_or_else(|| ErrorKind::InvalidToml)?;
     let alias_name = alias_map.get(config.cmd())
         .ok_or_else(|| ErrorKind::InvalidToml)?;
     let toml = config.toml().ok_or_else(|| ErrorKind::InvalidToml)?;
-    let cmds = toml.cmd().ok_or_else(|| ErrorKind::InvalidToml)?;
+    let cmds = toml.cmd();
     let alias_cmd = cmds.get(alias_name)
         .ok_or_else(|| ErrorKind::InvalidToml)?;
     Ok(alias_cmd.command().to_string())
@@ -312,8 +311,7 @@ pub fn cmd(config: &mut Config,
     }
 
     // Parse the toml and add to config if successful.
-    let toml_dir = config.toml_dir();
-    let final_config = match MusshToml::new(toml_dir) {
+    let final_config = match MusshToml::new(config) {
         Ok(toml) => config.set_toml(toml),
         Err(e) => {
             error!(stderr, "{}", e);

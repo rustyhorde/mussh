@@ -42,6 +42,6 @@ fn main() {
         Err(e) => {
             writeln!(io::stderr(), "{}", e).expect("badness");
             process::exit(1)
-        },
+        }
     }
 }
