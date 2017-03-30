@@ -17,6 +17,26 @@ use term;
 use toml;
 use util;
 
+/// Write the given TOML out to the `toml_dir` path.
+fn write_toml(config: &Config, toml: &MusshToml) -> Result<i32> {
+    if let Some(ref pb) = config.toml_dir() {
+        let mut bk_p = pb.clone();
+        bk_p.pop();
+        bk_p.push("mussh.toml.bk");
+        fs::copy(pb, bk_p)?;
+        let mut toml_file = OpenOptions::new().create(true)
+            .truncate(true)
+            .write(true)
+            .open(pb)?;
+
+        toml_file.write_all(&toml::to_vec(&toml)?)?;
+        Ok(0)
+    } else {
+        error!(config.stderr(), "Unable to determine TOML file path!");
+        Err(ErrorKind::Config.into())
+    }
+}
+
 /// Run the `host-list` sub-command.
 pub fn list_cmd(config: &mut Config) -> Result<i32> {
     // Parse the toml.
@@ -53,57 +73,83 @@ pub fn list_cmd(config: &mut Config) -> Result<i32> {
 }
 
 /// Run the `hosts-add` sub-command.
-pub fn add_cmd(config: &mut Config, add_m: &ArgMatches) -> Result<i32> {
+pub fn add_cmd(config: &mut Config, matches: &ArgMatches) -> Result<i32> {
     let mut host: Host = Default::default();
 
-    if let Some(username) = add_m.value_of("username") {
+    if let Some(username) = matches.value_of("username") {
         host.set_username(username);
     }
 
-    if let Some(hostname) = add_m.value_of("hostname") {
+    if let Some(hostname) = matches.value_of("hostname") {
         host.set_hostname(hostname);
     }
 
-    if let Some(port) = add_m.value_of("port") {
+    if let Some(port) = matches.value_of("port") {
         let p = u16::from_str(port)?;
         host.set_port(p);
     }
 
-    if let Some(pem) = add_m.value_of("pem") {
+    if let Some(pem) = matches.value_of("pem") {
         host.set_pem(pem);
     }
 
-    // Parse the toml.
-    let mut toml = match MusshToml::new(config) {
-        Ok(toml) => toml,
-        Err(_) => Default::default(),
-    };
+    if let Some(name) = matches.value_of("name") {
+        let mut toml = match MusshToml::new(config) {
+            Ok(toml) => toml,
+            Err(_) => Default::default(),
+        };
 
-    if let Some(ref pb) = config.toml_dir() {
-        let mut bk_p = pb.clone();
-        bk_p.pop();
-        bk_p.push("mussh.toml.bk");
-        fs::copy(pb, bk_p)?;
-        let mut toml_file = OpenOptions::new().create(true)
-            .truncate(true)
-            .write(true)
-            .open(pb)?;
+        toml.add_host(name, host);
 
-        toml.add_host("test", host);
-        toml_file.write_all(&toml::to_vec(&toml)?)?;
-        Ok(0)
+        match write_toml(config, &toml) {
+            Ok(i) => {
+                info!(config.stdout(), "'{}' added successfully", name);
+                Ok(i)
+            }
+            Err(e) => Err(e),
+        }
     } else {
-        error!(config.stderr(), "Unable to determine TOML file path!");
-        Err(ErrorKind::Config.into())
+        Err(ErrorKind::SubCommand.into())
     }
 }
 
-/// Run the `host` sub-command.
+/// Run the `hosts-remove` sub-command.
+pub fn remove_cmd(config: &mut Config, matches: &ArgMatches) -> Result<i32> {
+    if let Some(name) = matches.value_of("name") {
+        let mut toml = match MusshToml::new(config) {
+            Ok(toml) => toml,
+            Err(_) => Default::default(),
+        };
+
+        let mut hosts = toml.hosts().clone();
+        let rem = hosts.remove(name);
+
+        if rem.is_none() {
+            Err(ErrorKind::NoValidHosts.into())
+        } else {
+            toml.set_hosts(hosts);
+            match write_toml(config, &toml) {
+                Ok(i) => {
+                    info!(config.stdout(), "'{}' removed successfully", name);
+                    Ok(i)
+                }
+                Err(e) => Err(e),
+            }
+        }
+    } else {
+        Err(ErrorKind::SubCommand.into())
+    }
+}
+
+/// Run the `hosts` sub-command.
 pub fn cmd(config: &mut Config, sub_m: &ArgMatches) -> Result<i32> {
     match sub_m.subcommand() {
-        // 'host-list' subcommand
+        // 'hosts-list' subcommand
         ("list", Some(_)) => list_cmd(config),
-        ("add", Some(add_m)) => add_cmd(config, add_m),
+        // 'hosts-add' subcommand
+        ("add", Some(matches)) => add_cmd(config, matches),
+        // 'hosts-remove' subcommand
+        ("remove", Some(matches)) => remove_cmd(config, matches),
         _ => Err(ErrorKind::SubCommand.into()),
     }
 }
