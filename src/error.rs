@@ -41,6 +41,10 @@ error_chain!{
             description("Could not determine any valid hosts!")
             display("Could not determine any valid hosts!")
         }
+        NoValidHostlist {
+            description("Could not determine any valid hostlist!")
+            display("Could not determine any valid hostlist!")
+        }
         HostNotConfigured(host: String) {
             description("host not configured!")
             display("host {} not configured!", host)

@@ -246,6 +246,12 @@ impl MusshToml {
         &self.hostlist
     }
 
+    /// Set the `hostlist` value.
+    pub fn set_hostlist(&mut self, hostlist: BTreeMap<String, Hosts>) -> &mut MusshToml {
+        self.hostlist = hostlist;
+        self
+    }
+
     /// Add a `hostlist` value.
     pub fn add_hostlist(&mut self, k: &str, v: Hosts) -> &mut MusshToml {
         self.hostlist.insert(k.to_string(), v);

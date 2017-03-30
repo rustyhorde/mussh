@@ -54,6 +54,13 @@ pub fn run() -> Result<i32> {
                                                                .help("The hosts to add to the \
                                                                'hostlist'")
                                                                .index(2)
+                                                               .required(true)))
+                               .subcommand(SubCommand::with_name("remove")
+                                                      .about("Remove a 'hostlist' configuration")
+                                                      .arg(Arg::with_name("name")
+                                                               .value_name("NAME")
+                                                               .help("The assigned 'hostlist' name")
+                                                               .index(1)
                                                                .required(true))))
         .subcommand(SubCommand::with_name("hosts")
                                .about("Work with 'hosts' configuration")
