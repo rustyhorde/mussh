@@ -33,6 +33,10 @@ error_chain!{
             description("The specified host does not exist in TOML!")
             display("The specified host does not exist in TOML!")
         }
+        HostListDoesNotExist {
+            description("The specified hostlist does not exist in TOML!")
+            display("The specified hostlist does not exist in TOML!")
+        }
         InvalidToml {
             description("Invalid TOML configuration!")
             display("Invalid TOML configuration!")

@@ -108,6 +108,41 @@ pub fn remove_cmd(config: &mut Config, matches: &ArgMatches) -> Result<i32> {
     }
 }
 
+/// Run the `hostlist-update` sub-command.
+pub fn update_cmd(config: &mut Config, matches: &ArgMatches) -> Result<i32> {
+    if let Some(name) = matches.value_of("name") {
+        let toml = match MusshToml::new(config) {
+            Ok(toml) => toml,
+            Err(_) => Default::default(),
+        };
+
+        let hostlist = toml.hostlist();
+
+        if let Some(hl) = hostlist.get(name) {
+            let mut hostlist = hl.clone();
+            let mut mut_toml = toml.clone();
+            if let Some(hosts_iter) = matches.values_of("hosts") {
+                let h_vec = hosts_iter.map(|x| x.to_string()).collect();
+                hostlist.set_hostnames(h_vec);
+            }
+
+            mut_toml.add_hostlist(name, hostlist);
+
+            match cmd::write_toml(config, &mut_toml) {
+                Ok(i) => {
+                    info!(config.stdout(), "'{}' updated successfully", name);
+                    Ok(i)
+                }
+                Err(e) => Err(e),
+            }
+        } else {
+            Err(ErrorKind::HostListDoesNotExist.into())
+        }
+    } else {
+        Err(ErrorKind::SubCommand.into())
+    }
+}
+
 /// Run the `host` sub-command.
 pub fn cmd(config: &mut Config, sub_m: &ArgMatches, stderr: &Logger) -> Result<i32> {
     match sub_m.subcommand() {
@@ -117,6 +152,8 @@ pub fn cmd(config: &mut Config, sub_m: &ArgMatches, stderr: &Logger) -> Result<i
         ("add", Some(matches)) => add_cmd(config, matches),
         // 'hostlist-remove' subcommand
         ("remove", Some(matches)) => remove_cmd(config, matches),
+        // 'hostlist-update' subcommand
+        ("update", Some(matches)) => update_cmd(config, matches),
         _ => Err(ErrorKind::SubCommand.into()),
     }
 }
