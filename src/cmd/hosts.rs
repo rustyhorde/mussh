@@ -141,6 +141,53 @@ pub fn remove_cmd(config: &mut Config, matches: &ArgMatches) -> Result<i32> {
     }
 }
 
+/// Run the `hosts-update` sub-command.
+pub fn update_cmd(config: &mut Config, matches: &ArgMatches) -> Result<i32> {
+    if let Some(name) = matches.value_of("name") {
+        let toml = match MusshToml::new(config) {
+            Ok(toml) => toml,
+            Err(_) => Default::default(),
+        };
+
+        let hosts = toml.hosts();
+
+        if let Some(h) = hosts.get(name) {
+            let mut host = h.clone();
+            let mut mut_toml = toml.clone();
+            if let Some(username) = matches.value_of("username") {
+                host.set_username(username);
+            }
+
+            if let Some(hostname) = matches.value_of("hostname") {
+                host.set_hostname(hostname);
+            }
+
+            if let Some(port) = matches.value_of("port") {
+                let p = u16::from_str(port)?;
+                host.set_port(p);
+            }
+
+            if let Some(pem) = matches.value_of("pem") {
+                host.set_pem(pem);
+            }
+
+            mut_toml.add_host(name, host);
+
+            match write_toml(config, &mut_toml) {
+                Ok(i) => {
+                    info!(config.stdout(), "'{}' updated successfully", name);
+                    Ok(i)
+                }
+                Err(e) => Err(e),
+            }
+        } else {
+            Err(ErrorKind::HostDoesNotExist.into())
+        }
+    } else {
+        Err(ErrorKind::SubCommand.into())
+    }
+}
+
 /// Run the `hosts` sub-command.
 pub fn cmd(config: &mut Config, sub_m: &ArgMatches) -> Result<i32> {
     match sub_m.subcommand() {
@@ -150,6 +197,8 @@ pub fn cmd(config: &mut Config, sub_m: &ArgMatches) -> Result<i32> {
         ("add", Some(matches)) => add_cmd(config, matches),
         // 'hosts-remove' subcommand
         ("remove", Some(matches)) => remove_cmd(config, matches),
+        // 'hosts-update' subcommand
+        ("update", Some(matches)) => update_cmd(config, matches),
         _ => Err(ErrorKind::SubCommand.into()),
     }
 }

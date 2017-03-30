@@ -29,10 +29,10 @@ error_chain!{
         //     description("'hostlist' not configured properly in TOML!")
         //     display("'hostlist' not configured properly in TOML!")
         // }
-        // InvalidHosts {
-        //     description("'hosts' not configured properly in TOML!")
-        //     display("'hosts' not configured properly in TOML!")
-        // }
+        HostDoesNotExist {
+            description("The specified host does not exist in TOML!")
+            display("The specified host does not exist in TOML!")
+        }
         InvalidToml {
             description("Invalid TOML configuration!")
             display("Invalid TOML configuration!")
