@@ -279,6 +279,12 @@ impl MusshToml {
     pub fn cmd(&self) -> &BTreeMap<String, Command> {
         &self.cmd
     }
+
+    /// Add a `cmd` value.
+    pub fn add_cmd(&mut self, k: &str, v: Command) -> &mut MusshToml {
+        self.cmd.insert(k.to_string(), v);
+        self
+    }
 }
 
 impl Hosts {
@@ -410,6 +416,12 @@ impl Command {
     /// Get the `command` value.
     pub fn command(&self) -> &str {
         &self.command
+    }
+
+    /// Set the `command` value.
+    pub fn set_command(&mut self, command: &str) -> &mut Command {
+        self.command = command.to_string();
+        self
     }
 }
 

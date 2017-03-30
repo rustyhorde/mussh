@@ -8,7 +8,8 @@
 
 //! `host` sub-command.
 use clap::ArgMatches;
-use config::{Config, MusshToml};
+use cmd;
+use config::{Command, Config, MusshToml};
 use error::{ErrorKind, Result};
 use slog::Logger;
 use std::io::Write;
@@ -63,11 +64,41 @@ pub fn list_cmd(config: &mut Config, stderr: &Logger) -> Result<i32> {
     Ok(0)
 }
 
+/// Run the `hostlist-add` sub-command.
+pub fn add_cmd(config: &mut Config, matches: &ArgMatches) -> Result<i32> {
+    if let Some(name) = matches.value_of("name") {
+        let mut command: Command = Default::default();
+
+        if let Some(cmd) = matches.value_of("cmd") {
+            command.set_command(cmd);
+        }
+
+        let mut toml = match MusshToml::new(config) {
+            Ok(toml) => toml,
+            Err(_) => Default::default(),
+        };
+
+        toml.add_cmd(name, command);
+
+        match cmd::write_toml(config, &toml) {
+            Ok(i) => {
+                info!(config.stdout(), "'{}' added successfully", name);
+                Ok(i)
+            }
+            Err(e) => Err(e),
+        }
+    } else {
+        Err(ErrorKind::SubCommand.into())
+    }
+}
+
 /// Run the `host` sub-command.
 pub fn cmd(config: &mut Config, sub_m: &ArgMatches, stderr: &Logger) -> Result<i32> {
     match sub_m.subcommand() {
         // 'hostlist-list' subcommand
         ("list", Some(_)) => list_cmd(config, stderr),
+        // 'hostlist-add' subcommand
+        ("add", Some(matches)) => add_cmd(config, matches),
         _ => Err(ErrorKind::SubCommand.into()),
     }
 }
