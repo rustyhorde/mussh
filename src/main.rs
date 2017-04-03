@@ -38,9 +38,6 @@ use std::process;
 
 /// mussh entry point
 fn main() {
-    if let Ok(hostname) = sys_info::hostname() {
-        writeln!(io::stdout(), "hostname: {}", hostname).expect("badness");
-    }
     match run::run() {
         Ok(i) => process::exit(i),
         Err(e) => {

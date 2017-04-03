@@ -17,6 +17,7 @@ use std::{env, fmt};
 use std::fs::{File, OpenOptions};
 use std::io::{Read, Write};
 use std::path::PathBuf;
+use sys_info;
 use toml;
 
 /// Default configuration filename.
@@ -465,6 +466,9 @@ fn paths(arg: Option<PathBuf>) -> Vec<PathBuf> {
 
     if let Some(mut home_dir) = env::home_dir() {
         home_dir.push(DOT_DIR);
+        if let Ok(hostname) = sys_info::hostname() {
+            home_dir.push(hostname);
+        }
         home_dir.push(CONFIG_FILE_NAME);
         paths.push(home_dir);
     }
