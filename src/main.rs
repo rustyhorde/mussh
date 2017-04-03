@@ -23,6 +23,7 @@ extern crate serde;
 extern crate slog_async;
 extern crate slog_term;
 extern crate ssh2;
+extern crate sys_info;
 extern crate term;
 extern crate toml;
 
@@ -37,6 +38,9 @@ use std::process;
 
 /// mussh entry point
 fn main() {
+    if let Ok(hostname) = sys_info::hostname() {
+        writeln!(io::stdout(), "hostname: {}", hostname).expect("badness");
+    }
     match run::run() {
         Ok(i) => process::exit(i),
         Err(e) => {
