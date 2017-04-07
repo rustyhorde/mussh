@@ -36,7 +36,7 @@ pub fn list_cmd(config: &mut Config) -> Result<i32> {
             for (k, v) in hosts {
                 t.fg(term::color::GREEN)?;
                 t.attr(term::Attr::Bold)?;
-                write!(t, "  {}", util::pad_left(&k, max_k))?;
+                write!(t, "  {}", util::pad_left(k, max_k))?;
                 t.reset()?;
                 writeln!(t, "  {}", v)?;
                 t.flush()?;

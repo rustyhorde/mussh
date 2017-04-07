@@ -36,7 +36,7 @@ pub fn list_cmd(config: &mut Config, stderr: &Logger) -> Result<i32> {
             for (k, v) in cmd {
                 t.fg(term::color::GREEN)?;
                 t.attr(term::Attr::Bold)?;
-                write!(t, "  {}", util::pad_left(&k, max_k))?;
+                write!(t, "  {}", util::pad_left(k, max_k))?;
                 t.reset()?;
                 let sub_cmds = v.command().split(';');
 

@@ -25,7 +25,8 @@ fn write_toml(config: &Config, toml: &MusshToml) -> Result<i32> {
         bk_p.pop();
         bk_p.push("mussh.toml.bk");
         fs::copy(pb, bk_p)?;
-        let mut toml_file = OpenOptions::new().create(true)
+        let mut toml_file = OpenOptions::new()
+            .create(true)
             .truncate(true)
             .write(true)
             .open(pb)?;

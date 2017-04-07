@@ -84,7 +84,8 @@ type ConfigTuple = (String, String, u16, Option<String>, Option<BTreeMap<String,
 fn setup_host(config: &Config, hostname: &str) -> Result<ConfigTuple> {
     let toml = config.toml().ok_or_else(|| ErrorKind::InvalidToml)?;
     let hosts = toml.hosts();
-    let host = hosts.get(hostname)
+    let host = hosts
+        .get(hostname)
         .ok_or_else(|| ErrorKind::HostNotConfigured(hostname.to_string()))?;
     let username = host.username();
     let hn = host.hostname();
@@ -105,7 +106,8 @@ fn setup_host(config: &Config, hostname: &str) -> Result<ConfigTuple> {
 /// Setup the command aliases.
 fn setup_alias(config: &Config, alias: Option<BTreeMap<String, String>>) -> Result<String> {
     let alias_map = alias.ok_or_else(|| ErrorKind::InvalidToml)?;
-    let alias_name = alias_map.get(config.cmd())
+    let alias_name = alias_map
+        .get(config.cmd())
         .ok_or_else(|| ErrorKind::InvalidToml)?;
     let toml = config.toml().ok_or_else(|| ErrorKind::InvalidToml)?;
     let cmds = toml.cmd();
