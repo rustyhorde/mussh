@@ -508,12 +508,7 @@ pub struct FileDrain {
 impl FileDrain {
     /// Create a new `FileDrain` that will write to a file at the given path.
     pub fn new(path: PathBuf) -> Result<FileDrain> {
-        Ok(FileDrain {
-               file: OpenOptions::new()
-                   .create(true)
-                   .append(true)
-                   .open(path)?,
-           })
+        Ok(FileDrain { file: OpenOptions::new().create(true).append(true).open(path)? })
     }
 }
 

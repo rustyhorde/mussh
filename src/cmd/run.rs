@@ -111,8 +111,7 @@ fn setup_alias(config: &Config, alias: Option<BTreeMap<String, String>>) -> Resu
         .ok_or_else(|| ErrorKind::InvalidToml)?;
     let toml = config.toml().ok_or_else(|| ErrorKind::InvalidToml)?;
     let cmds = toml.cmd();
-    let alias_cmd = cmds.get(alias_name)
-        .ok_or_else(|| ErrorKind::InvalidToml)?;
+    let alias_cmd = cmds.get(alias_name).ok_or_else(|| ErrorKind::InvalidToml)?;
     Ok(alias_cmd.command().to_string())
 }
 
