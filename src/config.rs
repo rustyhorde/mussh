@@ -147,11 +147,13 @@ fn stderr_logger() -> Logger {
         .fuse();
     let stderr_async_drain = slog_async::Async::new(stderr_drain).build().fuse();
     let stderr_level_drain = LevelFilter::new(stderr_async_drain, Level::Error).fuse();
-    Logger::root(stderr_level_drain,
-                 o!(
+    Logger::root(
+        stderr_level_drain,
+        o!(
         "executable" => env!("CARGO_PKG_NAME"),
         "version" => env!("CARGO_PKG_VERSION")
-    ))
+    ),
+    )
 }
 
 /// Setup the stdout slog `Logger`
@@ -162,11 +164,13 @@ fn stdout_logger(level: Level) -> Logger {
         .fuse();
     let stdout_async_drain = slog_async::Async::new(stdout_drain).build().fuse();
     let stdout_level_drain = LevelFilter::new(stdout_async_drain, level).fuse();
-    Logger::root(stdout_level_drain,
-                 o!(
+    Logger::root(
+        stdout_level_drain,
+        o!(
         "executable" => env!("CARGO_PKG_NAME"),
         "version" => env!("CARGO_PKG_VERSION")
-    ))
+    ),
+    )
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
