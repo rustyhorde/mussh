@@ -7,7 +7,7 @@
 // modified, or distributed except according to those terms.
 
 //! `mussh` config.
-use chrono::{DateTime, UTC};
+use chrono::{DateTime, Utc};
 use error::{ErrorKind, Result};
 use slog::{Drain, Level, LevelFilter, Logger, Never, OwnedKVList, Record};
 use slog_async;
@@ -522,7 +522,7 @@ impl Drain for FileDrain {
 
     fn log(&self, record: &Record, _: &OwnedKVList) -> ::std::result::Result<(), Never> {
         if let Ok(mut log_file) = self.file.try_clone() {
-            let utc: DateTime<UTC> = UTC::now();
+            let utc: DateTime<Utc> = Utc::now();
             match writeln!(log_file, "{}: {}", utc.to_rfc3339(), record.msg()) {
                 Ok(()) => {}
                 Err(_e) => {}
