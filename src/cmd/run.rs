@@ -78,7 +78,13 @@ fn setup_command(config: &Config) -> Result<String> {
 }
 
 /// Host Configuration tuple.
-type ConfigTuple = (String, String, u16, Option<String>, Option<BTreeMap<String, String>>);
+type ConfigTuple = (
+    String,
+    String,
+    u16,
+    Option<String>,
+    Option<BTreeMap<String, String>>,
+);
 
 /// Setup a host given a hostname.
 fn setup_host(config: &Config, hostname: &str) -> Result<ConfigTuple> {
@@ -116,14 +122,15 @@ fn setup_alias(config: &Config, alias: Option<BTreeMap<String, String>>) -> Resu
 }
 
 /// Execute the command.
-fn execute(logs: (&Logger, &Logger),
-           host: &str,
-           hostname: &str,
-           port: u16,
-           command: &str,
-           username: &str,
-           pem: Option<String>)
-           -> Result<()> {
+fn execute(
+    logs: (&Logger, &Logger),
+    host: &str,
+    hostname: &str,
+    port: u16,
+    command: &str,
+    username: &str,
+    pem: Option<String>,
+) -> Result<()> {
     let (stdout, stderr) = logs;
     let mut host_file_path = if let Some(mut home_dir) = env::home_dir() {
         home_dir.push(config::DOT_DIR);
@@ -211,23 +218,21 @@ fn execute(logs: (&Logger, &Logger),
             }
 
             match channel.exit_status() {
-                Ok(code) => {
-                    if code == 0 {
-                        info!(
+                Ok(code) => if code == 0 {
+                    info!(
                             stdout,
                             "execute";
                             "host" => host,
                             "duration" => timer.elapsed().as_secs()
                         );
-                    } else {
-                        error!(
+                } else {
+                    error!(
                             stderr,
                             "execute";
                             "host" => host,
                             "duration" => timer.elapsed().as_secs()
                         );
-                    }
-                }
+                },
                 Err(e) => {
                     error!(
                         stderr,
@@ -264,14 +269,15 @@ fn multiplex(config: &Config) -> Result<()> {
         trace!(stdout, "multiplex"; "hostname" => &host, "cmd" => &cmd);
         let h_tx = tx.clone();
         thread::spawn(move || {
-            h_tx.send(execute((&stdout, &stderr),
-                              &host,
-                              &hostname,
-                              port,
-                              &cmd,
-                              &username,
-                              pem))
-                .expect("badness");
+            h_tx.send(execute(
+                (&stdout, &stderr),
+                &host,
+                &hostname,
+                port,
+                &cmd,
+                &username,
+                pem,
+            )).expect("badness");
         });
 
         if config.sync() {
@@ -294,11 +300,12 @@ fn multiplex(config: &Config) -> Result<()> {
 }
 
 /// Run the `run` sub-command.
-pub fn cmd(config: &mut Config,
-           sub_m: &ArgMatches,
-           stdout: &Logger,
-           stderr: &Logger)
-           -> Result<i32> {
+pub fn cmd(
+    config: &mut Config,
+    sub_m: &ArgMatches,
+    stdout: &Logger,
+    stderr: &Logger,
+) -> Result<i32> {
     if let Some(cmd) = sub_m.value_of("command") {
         config.set_cmd(cmd);
     }
