@@ -40,9 +40,7 @@ pub fn run() -> Result<i32> {
         .subcommand(
             SubCommand::with_name("cmd")
                 .about("Work with 'cmd' configuration")
-                .subcommand(
-                    SubCommand::with_name("list").about("List the 'cmd' configuration"),
-                )
+                .subcommand(SubCommand::with_name("list").about("List the 'cmd' configuration"))
                 .subcommand(
                     SubCommand::with_name("add")
                         .about("Add 'cmd' configuration")
@@ -159,9 +157,7 @@ pub fn run() -> Result<i32> {
         .subcommand(
             SubCommand::with_name("hosts")
                 .about("Work with 'hosts' configuration")
-                .subcommand(
-                    SubCommand::with_name("list").about("List the 'hosts' configuration"),
-                )
+                .subcommand(SubCommand::with_name("list").about("List the 'hosts' configuration"))
                 .subcommand(
                     SubCommand::with_name("add")
                         .about("Add 'hosts' configuration")
