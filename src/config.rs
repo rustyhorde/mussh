@@ -21,9 +21,9 @@ use sys_info;
 use toml;
 
 /// Default configuration filename.
-pub const CONFIG_FILE_NAME: &'static str = "mussh.toml";
+pub const CONFIG_FILE_NAME: &str = "mussh.toml";
 /// Default 'dot' directory for `mussh` configuration.
-pub const DOT_DIR: &'static str = ".mussh";
+pub const DOT_DIR: &str = ".mussh";
 
 /// `mussh` Config
 #[derive(Clone)]
