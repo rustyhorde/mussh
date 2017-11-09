@@ -319,7 +319,7 @@ pub fn cmd(
         for host in &hosts {
             trace!(stdout, "{}", host);
         }
-        config.set_hosts(hosts);
+        config.set_hosts(&hosts);
     }
 
     // Create the dot dir if it doesn't exist.

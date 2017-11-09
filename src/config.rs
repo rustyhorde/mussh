@@ -77,7 +77,7 @@ impl Config {
     }
 
     /// Set the `hosts` value.
-    pub fn set_hosts(&mut self, hosts: Vec<&str>) -> &mut Config {
+    pub fn set_hosts(&mut self, hosts: &[&str]) -> &mut Config {
         self.hosts = hosts.iter().map(|x| x.to_string()).collect();
         self
     }
