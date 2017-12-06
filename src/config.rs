@@ -503,7 +503,6 @@ fn add_system_path(paths: &mut Vec<PathBuf>) {
     paths.push(appdata);
 }
 
-
 /// A `slog` drain that writes to a file.
 #[derive(Debug)]
 pub struct FileDrain {
