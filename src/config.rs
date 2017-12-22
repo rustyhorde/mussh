@@ -360,8 +360,8 @@ impl Host {
 
     /// Get the `pem` value.
     pub fn pem(&self) -> Option<&str> {
-        match self.pem {
-            Some(ref p) => Some(p),
+        match self.pem.as_ref() {
+            Some(p) => Some(p),
             None => None,
         }
     }
