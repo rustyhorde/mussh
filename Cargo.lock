@@ -30,7 +30,7 @@ name = "backtrace-sys"
 version = "0.1.16"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
- "cc 1.0.4 (registry+https://github.com/rust-lang/crates.io-index)",
+ "cc 1.0.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "libc 0.2.37 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
@@ -51,7 +51,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
 name = "cc"
-version = "1.0.4"
+version = "1.0.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
@@ -87,7 +87,7 @@ name = "cmake"
 version = "0.1.29"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
- "cc 1.0.4 (registry+https://github.com/rust-lang/crates.io-index)",
+ "cc 1.0.5 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -145,7 +145,7 @@ name = "libz-sys"
 version = "1.0.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
- "cc 1.0.4 (registry+https://github.com/rust-lang/crates.io-index)",
+ "cc 1.0.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "libc 0.2.37 (registry+https://github.com/rust-lang/crates.io-index)",
  "pkg-config 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
  "vcpkg 0.2.2 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -206,7 +206,7 @@ name = "openssl-sys"
 version = "0.9.27"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
- "cc 1.0.4 (registry+https://github.com/rust-lang/crates.io-index)",
+ "cc 1.0.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "libc 0.2.37 (registry+https://github.com/rust-lang/crates.io-index)",
  "pkg-config 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
  "vcpkg 0.2.2 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -329,7 +329,7 @@ name = "sys-info"
 version = "0.5.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
- "cc 1.0.4 (registry+https://github.com/rust-lang/crates.io-index)",
+ "cc 1.0.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "libc 0.2.37 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
@@ -471,7 +471,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 "checksum bitflags 0.7.0 (registry+https://github.com/rust-lang/crates.io-index)" = "aad18937a628ec6abcd26d1489012cc0e18c21798210f491af69ded9b881106d"
 "checksum bitflags 1.0.1 (registry+https://github.com/rust-lang/crates.io-index)" = "b3c30d3802dfb7281680d6285f2ccdaa8c2d8fee41f93805dba5c4cf50dc23cf"
 "checksum byteorder 1.2.1 (registry+https://github.com/rust-lang/crates.io-index)" = "652805b7e73fada9d85e9a6682a4abd490cb52d96aeecc12e33a0de34dfd0d23"
-"checksum cc 1.0.4 (registry+https://github.com/rust-lang/crates.io-index)" = "deaf9ec656256bb25b404c51ef50097207b9cbb29c933d31f92cae5a8a0ffee0"
+"checksum cc 1.0.5 (registry+https://github.com/rust-lang/crates.io-index)" = "9be26b24e988625409b19736d130f0c7d224f01d06454b5f81d8d23d6c1a618f"
 "checksum cfg-if 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)" = "d4c819a1287eb618df47cc647173c5c4c66ba19d888a6e50d605672aed3140de"
 "checksum chrono 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)" = "7c20ebe0b2b08b0aeddba49c609fe7957ba2e33449882cb186a180bc60682fa9"
 "checksum clap 2.30.0 (registry+https://github.com/rust-lang/crates.io-index)" = "1c07b9257a00f3fc93b7f3c417fc15607ec7a56823bc2c37ec744e266387de5b"
