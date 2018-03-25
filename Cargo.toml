@@ -8,12 +8,12 @@ license = "MIT/Apache-2.0"
 name = "mussh"
 readme = "README.md"
 repository = "https://github.com/rustyhorde/mussh"
-version = "2.2.1"
+version = "2.2.2"
 
 [dependencies]
 chrono = "0"
 clap = "2"
-error-chain = "0.11.0-rc.2"
+error-chain = "0"
 serde = "1"
 serde_derive = "1"
 slog-async = "2"
@@ -25,4 +25,4 @@ toml = "0"
 
 [dependencies.slog]
 features = ["max_level_trace", "release_max_level_trace"]
-version = "2"
+version = "=2.1.1"
