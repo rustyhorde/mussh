@@ -13,10 +13,10 @@ use slog::{Drain, Level, LevelFilter, Logger, Never, OwnedKVList, Record};
 use slog_async;
 use slog_term;
 use std::collections::BTreeMap;
-use std::{env, fmt};
 use std::fs::{File, OpenOptions};
 use std::io::{Read, Write};
 use std::path::PathBuf;
+use std::{env, fmt};
 use sys_info;
 use toml;
 

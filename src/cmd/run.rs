@@ -14,13 +14,13 @@ use slog::{Drain, Logger};
 use slog_async;
 use ssh2::Session;
 use std::collections::BTreeMap;
-use std::{env, fs, thread};
 use std::io::{BufRead, BufReader};
 use std::net::TcpStream;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::sync::mpsc;
 use std::time::Instant;
+use std::{env, fs, thread};
 
 /// Setup the hostnames from the toml config.
 fn setup_hostnames(config: &Config) -> Result<Vec<String>> {
