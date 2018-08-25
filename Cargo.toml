@@ -25,4 +25,4 @@ toml = "0"
 
 [dependencies.slog]
 features = ["max_level_trace", "release_max_level_trace"]
-version = "=2.1.1"
+version = "2"
