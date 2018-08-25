@@ -22,6 +22,7 @@ extern crate slog;
 
 extern crate chrono;
 extern crate clap;
+extern crate dirs;
 extern crate slog_async;
 extern crate slog_term;
 extern crate ssh2;

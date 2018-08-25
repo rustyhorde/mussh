@@ -8,6 +8,7 @@
 
 //! `mussh` config.
 use chrono::{DateTime, Utc};
+use dirs;
 use error::{ErrorKind, Result};
 use slog::{Drain, Level, LevelFilter, Logger, Never, OwnedKVList, Record};
 use slog_async;
@@ -470,7 +471,7 @@ fn paths(arg: Option<PathBuf>) -> Vec<PathBuf> {
         paths.push(cur_dir);
     }
 
-    if let Some(mut home_dir) = env::home_dir() {
+    if let Some(mut home_dir) = dirs::home_dir() {
         home_dir.push(DOT_DIR);
         if let Ok(hostname) = sys_info::hostname() {
             home_dir.push(hostname);

@@ -9,6 +9,7 @@
 //! `mussh` run sub-command.
 use clap::ArgMatches;
 use config::{self, Config, FileDrain, MusshToml};
+use dirs;
 use error::{ErrorKind, Result};
 use slog::{Drain, Logger};
 use slog_async;
@@ -20,7 +21,7 @@ use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::sync::mpsc;
 use std::time::Instant;
-use std::{env, fs, thread};
+use std::{fs, thread};
 
 /// Setup the hostnames from the toml config.
 fn setup_hostnames(config: &Config) -> Result<Vec<String>> {
@@ -132,7 +133,7 @@ fn execute(
     pem: Option<String>,
 ) -> Result<()> {
     let (stdout, stderr) = logs;
-    let mut host_file_path = if let Some(mut home_dir) = env::home_dir() {
+    let mut host_file_path = if let Some(mut home_dir) = dirs::home_dir() {
         home_dir.push(config::DOT_DIR);
         home_dir
     } else {
@@ -323,7 +324,7 @@ pub fn cmd(
     }
 
     // Create the dot dir if it doesn't exist.
-    if let Some(mut home_dir) = env::home_dir() {
+    if let Some(mut home_dir) = dirs::home_dir() {
         home_dir.push(config::DOT_DIR);
         if fs::metadata(&home_dir).is_err() || fs::create_dir_all(home_dir).is_err() {
             error!(stderr, "cannot use/create the home directory!");
