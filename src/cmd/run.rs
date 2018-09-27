@@ -219,21 +219,23 @@ fn execute(
             }
 
             match channel.exit_status() {
-                Ok(code) => if code == 0 {
-                    info!(
+                Ok(code) => {
+                    if code == 0 {
+                        info!(
                             stdout,
                             "execute";
                             "host" => host,
                             "duration" => timer.elapsed().as_secs()
                         );
-                } else {
-                    error!(
+                    } else {
+                        error!(
                             stderr,
                             "execute";
                             "host" => host,
                             "duration" => timer.elapsed().as_secs()
                         );
-                },
+                    }
+                }
                 Err(e) => {
                     error!(
                         stderr,
@@ -278,7 +280,8 @@ fn multiplex(config: &Config) -> Result<()> {
                 &cmd,
                 &username,
                 pem,
-            )).expect("badness");
+            ))
+            .expect("badness");
         });
 
         if config.sync() {
