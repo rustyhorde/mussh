@@ -7,10 +7,7 @@
 // modified, or distributed except according to those terms.
 
 //! mussh - SSH Multiplexing
-#![cfg_attr(
-    feature = "cargo-clippy",
-    allow(unseparated_literal_suffix, use_self)
-)]
+#![cfg_attr(feature = "cargo-clippy", allow(unseparated_literal_suffix, use_self))]
 #![recursion_limit = "128"]
 #![deny(missing_docs)]
 #[macro_use]
