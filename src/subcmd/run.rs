@@ -13,11 +13,11 @@ impl SubCmd for Run {
                  but don't run it.",
             ))
             .arg(
-                Arg::with_name("command")
+                Arg::with_name("commands")
                     .short("c")
-                    .long("command")
+                    .long("commands")
                     .value_name("CMD")
-                    .help("The command to multiplex")
+                    .help("The commands to multiplex")
                     .multiple(true)
                     .required(true),
             )
@@ -36,8 +36,28 @@ impl SubCmd for Run {
             ))
     }
 
-    fn cmd(_matches: &ArgMatches<'_>) -> Fallible<()> {
-        println!("Running commands against host");
+    fn cmd(matches: &ArgMatches<'_>) -> Fallible<()> {
+        let commands: Vec<_> = matches
+            .values_of("commands")
+            .ok_or_else(|| failure::err_msg("No commands found to run!"))?
+            .collect();
+        let hosts: Vec<_> = matches
+            .values_of("hosts")
+            .ok_or_else(|| failure::err_msg("No commands found to run!"))?
+            .collect();
+        let is_synchronous = matches.is_present("sync");
+
+        println!(
+            "Running '{}' against '{}' {}",
+            commands.join(", "),
+            hosts.join(", "),
+            if is_synchronous {
+                "synchronously"
+            } else {
+                "asynchronously"
+            }
+        );
+
         Ok(())
     }
 }

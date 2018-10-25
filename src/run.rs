@@ -63,7 +63,7 @@ mod test {
 
         if let ("run", Some(sub_m)) = app_m.subcommand() {
             // Check the commands
-            check_multiple_arg(sub_m, "command", &["python", "nginx", "tmux"]);
+            check_multiple_arg(sub_m, "commands", &["python", "nginx", "tmux"]);
             // Check the hosts
             check_multiple_arg(sub_m, "hosts", &["all", "!m8"]);
             // Check for the presence of sync
@@ -84,7 +84,7 @@ mod test {
 
         if let ("run", Some(sub_m)) = app_m.subcommand() {
             // Check the commands
-            check_multiple_arg(sub_m, "command", &["python", "nginx", "tmux"]);
+            check_multiple_arg(sub_m, "commands", &["python", "nginx", "tmux"]);
             // Check the hosts
             check_multiple_arg(sub_m, "hosts", &["all", "!m8"]);
             // Check for the presence of sync
@@ -105,7 +105,7 @@ mod test {
 
         if let ("run", Some(sub_m)) = app_m.subcommand() {
             // Check the commands
-            check_multiple_arg(sub_m, "command", &["python", "nginx", "tmux"]);
+            check_multiple_arg(sub_m, "commands", &["python", "nginx", "tmux"]);
             // Check the hosts
             check_multiple_arg(sub_m, "hosts", &["all", "!m8"]);
             // Check for the presence of sync
@@ -126,7 +126,7 @@ mod test {
 
         if let ("run", Some(sub_m)) = app_m.subcommand() {
             // Check the commands
-            check_multiple_arg(sub_m, "command", &["python", "nginx", "tmux"]);
+            check_multiple_arg(sub_m, "commands", &["python", "nginx", "tmux"]);
             // Check the hosts
             check_multiple_arg(sub_m, "hosts", &["all", "!m8"]);
             // Check for the presence of sync
