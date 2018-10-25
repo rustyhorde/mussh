@@ -42,6 +42,8 @@
 #![allow(clippy::stutter)]
 #![doc(html_root_url = "https://docs.rs/mussh/3.0.0")]
 
+mod config;
+mod logging;
 mod run;
 mod subcmd;
 

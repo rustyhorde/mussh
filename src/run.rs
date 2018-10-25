@@ -1,9 +1,38 @@
 use clap::{App, Arg};
+use crate::logging::{Loggers, Slogger};
 use crate::subcmd::{Run, SubCmd};
 use failure::Fallible;
+use slog::trace;
+use slog_try::try_trace;
+use std::convert::TryFrom;
+use std::env;
+use std::path::PathBuf;
+
+fn base_config_dir() -> Fallible<PathBuf> {
+    Ok(if let Some(config_dir) = dirs::config_dir() {
+        config_dir
+    } else if let Ok(current_dir) = env::current_dir() {
+        current_dir
+    } else {
+        return Err(failure::err_msg(
+            "Unable to determine a suitable config directory!",
+        ));
+    }
+    .join(env!("CARGO_PKG_NAME")))
+}
 
 crate fn run() -> Fallible<()> {
-    match app().get_matches_safe()?.subcommand() {
+    let path_str = format!("{}", base_config_dir()?.display());
+    let matches = app(&path_str).get_matches_safe()?;
+    let (stdout, stderr) = Loggers::try_from(&matches)?.split();
+
+    try_trace!(
+        stdout,
+        "Config Dir: {}",
+        matches.value_of("config").unwrap_or_else(|| "")
+    );
+
+    match matches.subcommand() {
         // 'cmd' subcommand
         // ("cmd", Some(sub_m)) => command::cmd(&mut config, sub_m, &stderr),
         // 'hostlist' subcommand
@@ -11,12 +40,15 @@ crate fn run() -> Fallible<()> {
         // 'hosts' subcommand
         // ("hosts", Some(sub_m)) => hosts::cmd(&mut config, sub_m),
         // 'run' subcommand
-        ("run", Some(sub_m)) => Run::cmd(sub_m),
+        ("run", Some(sub_m)) => Run::try_from(sub_m)?
+            .set_stdout(stdout)
+            .set_stderr(stderr)
+            .cmd(),
         (cmd, _) => Err(failure::err_msg(format!("Unknown subcommand {}", cmd))),
     }
 }
 
-fn app<'a, 'b>() -> App<'a, 'b> {
+fn app<'a, 'b>(default_config_path: &'a str) -> App<'a, 'b> {
     App::new(env!("CARGO_PKG_NAME"))
         .version(env!("CARGO_PKG_VERSION"))
         .author("Jason Ozias <jason.g.ozias@gmail.com>")
@@ -26,7 +58,8 @@ fn app<'a, 'b>() -> App<'a, 'b> {
                 .short("c")
                 .long("config")
                 .value_name("CONFIG")
-                .help("Specify a non-standard path for the TOML config file.")
+                .help("Specify a path for the TOML config file.")
+                .default_value(default_config_path)
                 .takes_value(true),
         )
         .arg(
@@ -57,8 +90,8 @@ mod test {
 
     #[test]
     fn full_run_subcmd() -> Fallible<()> {
-        let app_m = app().get_matches_from_safe(vec![
-            "mussh", "run", "-c", "python", "nginx", "tmux", "-h", "all", "!m8", "-s",
+        let app_m = app("").get_matches_from_safe(vec![
+            "mussh", "-vvv", "run", "-c", "python", "nginx", "tmux", "-h", "all", "!m8", "-s",
         ])?;
 
         if let ("run", Some(sub_m)) = app_m.subcommand() {
@@ -78,7 +111,7 @@ mod test {
 
     #[test]
     fn full_run_subcmd_alt_order_one() -> Fallible<()> {
-        let app_m = app().get_matches_from_safe(vec![
+        let app_m = app("").get_matches_from_safe(vec![
             "mussh", "run", "-h", "all", "!m8", "-s", "-c", "python", "nginx", "tmux",
         ])?;
 
@@ -99,7 +132,7 @@ mod test {
 
     #[test]
     fn full_run_subcmd_alt_order_two() -> Fallible<()> {
-        let app_m = app().get_matches_from_safe(vec![
+        let app_m = app("").get_matches_from_safe(vec![
             "mussh", "run", "-s", "-h", "all", "!m8", "-c", "python", "nginx", "tmux",
         ])?;
 
@@ -120,7 +153,7 @@ mod test {
 
     #[test]
     fn run_subcmd_no_sync() -> Fallible<()> {
-        let app_m = app().get_matches_from_safe(vec![
+        let app_m = app("").get_matches_from_safe(vec![
             "mussh", "run", "-c", "python", "nginx", "tmux", "-h", "all", "!m8",
         ])?;
 
@@ -141,14 +174,14 @@ mod test {
 
     #[test]
     fn run_subcommand_missing_commands() {
-        assert!(app()
+        assert!(app("")
             .get_matches_from_safe(vec!["mussh", "run", "-h", "all", "!m8", "-s",])
             .is_err());
     }
 
     #[test]
     fn run_subcommand_missing_hosts() {
-        assert!(app()
+        assert!(app("")
             .get_matches_from_safe(vec!["mussh", "run", "-c", "python", "nginx", "tmux", "-s",])
             .is_err());
     }

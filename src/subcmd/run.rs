@@ -1,8 +1,35 @@
 use clap::{App, Arg, ArgMatches, SubCommand};
+use crate::config::Mussh;
+use crate::logging::Slogger;
 use crate::subcmd::SubCmd;
-use failure::Fallible;
+use failure::{Error, Fallible};
+use getset::{Getters, Setters};
+use slog::{info, Logger};
+use slog_try::try_info;
+use std::convert::TryFrom;
 
-crate struct Run;
+#[derive(Clone, Debug, Default, Getters, Setters)]
+crate struct Run {
+    commands: Vec<String>,
+    hosts: Vec<String>,
+    sync: bool,
+    stdout: Option<Logger>,
+    stderr: Option<Logger>,
+    #[set = "pub"]
+    config: Option<Mussh>,
+}
+
+impl Slogger for Run {
+    fn set_stdout(mut self, stdout: Option<Logger>) -> Self {
+        self.stdout = stdout;
+        self
+    }
+
+    fn set_stderr(mut self, stderr: Option<Logger>) -> Self {
+        self.stderr = stderr;
+        self
+    }
+}
 
 impl SubCmd for Run {
     fn subcommand<'a, 'b>() -> App<'a, 'b> {
@@ -36,22 +63,13 @@ impl SubCmd for Run {
             ))
     }
 
-    fn cmd(matches: &ArgMatches<'_>) -> Fallible<()> {
-        let commands: Vec<_> = matches
-            .values_of("commands")
-            .ok_or_else(|| failure::err_msg("No commands found to run!"))?
-            .collect();
-        let hosts: Vec<_> = matches
-            .values_of("hosts")
-            .ok_or_else(|| failure::err_msg("No commands found to run!"))?
-            .collect();
-        let is_synchronous = matches.is_present("sync");
-
-        println!(
+    fn cmd(&self) -> Fallible<()> {
+        try_info!(
+            self.stdout,
             "Running '{}' against '{}' {}",
-            commands.join(", "),
-            hosts.join(", "),
-            if is_synchronous {
+            self.commands.join(", "),
+            self.hosts.join(", "),
+            if self.sync {
                 "synchronously"
             } else {
                 "asynchronously"
@@ -59,5 +77,25 @@ impl SubCmd for Run {
         );
 
         Ok(())
+    }
+}
+
+impl<'a> TryFrom<&'a ArgMatches<'a>> for Run {
+    type Error = Error;
+
+    fn try_from(matches: &'a ArgMatches<'a>) -> Fallible<Self> {
+        let mut run = Self::default();
+        run.commands = matches
+            .values_of("commands")
+            .ok_or_else(|| failure::err_msg("No commands found to run!"))?
+            .map(|s| s.to_string())
+            .collect();
+        run.hosts = matches
+            .values_of("hosts")
+            .ok_or_else(|| failure::err_msg("No commands found to run!"))?
+            .map(|s| s.to_string())
+            .collect();
+        run.sync = matches.is_present("sync");
+        Ok(run)
     }
 }

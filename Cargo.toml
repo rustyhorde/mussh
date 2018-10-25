@@ -13,7 +13,15 @@ version = "3.0.0"
 
 [dependencies]
 clap = "2"
+dirs = "1"
+getset = "0"
 failure = "0"
+serde = "1"
+serde_derive = "1"
+slog-async = "2"
+slog-term = "2"
+slog-try = "0"
+toml = "0"
 
 [dependencies.slog]
 features = ["max_level_trace", "release_max_level_trace"]
