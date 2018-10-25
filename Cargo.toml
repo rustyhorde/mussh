@@ -2,27 +2,18 @@
 authors = ["Jason Ozias <jason.g.ozias@gmail.com>"]
 description = "SSH Multiplexing"
 documentation = "http://rustyhorde.github.io/mussh"
+edition = "2018"
 homepage = "http://rustyhorde.github.io/mussh"
 keywords = ["mussh", "ssh"]
 license = "MIT/Apache-2.0"
 name = "mussh"
 readme = "README.md"
 repository = "https://github.com/rustyhorde/mussh"
-version = "2.3.0"
+version = "3.0.0"
 
 [dependencies]
-chrono = "0"
 clap = "2"
-error-chain = "0"
-serde = "1"
-serde_derive = "1"
-slog-async = "2"
-slog-term = "2"
-ssh2 = "0"
-sys-info = "0"
-term = "0"
-toml = "0"
-dirs = "1"
+failure = "0"
 
 [dependencies.slog]
 features = ["max_level_trace", "release_max_level_trace"]
