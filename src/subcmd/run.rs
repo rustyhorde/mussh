@@ -1,11 +1,11 @@
 use clap::{App, Arg, ArgMatches, SubCommand};
 use crate::config::Mussh;
+use crate::error::MusshErrorKind;
 use crate::logging::Slogger;
 use crate::subcmd::SubCmd;
 use failure::{Error, Fallible};
 use getset::{Getters, Setters};
-use slog::{info, Logger};
-use slog_try::try_info;
+use slog::Logger;
 use std::convert::TryFrom;
 
 #[derive(Clone, Debug, Default, Getters, Setters)]
@@ -16,6 +16,7 @@ crate struct Run {
     stdout: Option<Logger>,
     stderr: Option<Logger>,
     #[set = "pub"]
+    #[get = "pub"]
     config: Option<Mussh>,
 }
 
@@ -64,19 +65,11 @@ impl SubCmd for Run {
     }
 
     fn cmd(&self) -> Fallible<()> {
-        try_info!(
-            self.stdout,
-            "Running '{}' against '{}' {}",
-            self.commands.join(", "),
-            self.hosts.join(", "),
-            if self.sync {
-                "synchronously"
-            } else {
-                "asynchronously"
-            }
-        );
-
-        Ok(())
+        if let Some(_config) = self.config() {
+            Ok(())
+        } else {
+            Err(MusshErrorKind::InvalidConfigToml.into())
+        }
     }
 }
 

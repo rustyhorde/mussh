@@ -1,53 +1,88 @@
 [hostlist.all]
-hostnames = ["m1", "m2", "m3", "m5", "m6", "tools", "localhost"]
+hostnames = ["m1", "m2", "m3", "m4", "m5", "m6", "m7", "m8", "lh"]
 
-[hostlist.most]
-hostnames = ["m1", "m2", "m3", "m5", "m6", "localhost"]
+[hostlist.i686]
+hostnames = ["m1", "m2", "m3"]
 
 [hostlist.local]
-hostnames = ["localhost"]
+hostnames = ["lh"]
 
-[hosts.localhost]
+[hostlist.m1]
+hostnames = ["m1"]
+
+[hostlist.m2]
+hostnames = ["m2"]
+
+[hostlist.m3]
+hostnames = ["m3"]
+
+[hostlist.m4]
+hostnames = ["m4"]
+
+[hostlist.m5]
+hostnames = ["m5"]
+
+[hostlist.m6]
+hostnames = ["m6"]
+
+[hostlist.m7]
+hostnames = ["m7"]
+
+[hostlist.m8]
+hostnames = ["m8"]
+
+[hostlist.most]
+hostnames = ["m1", "m2", "m3", "m4", "m5", "m6", "m8", "lh"]
+
+[hostlist.x86_64]
+hostnames = ["lh", "m4", "m5", "m6", "m7", "m8"]
+
+[hosts.lh]
 hostname = "localhost"
+username = "jozias"
 
 [hosts.m1]
-hostname = "jasonozias.com"
-port = 22
+hostname = "10.0.0.3"
+username = "jozias"
 
 [hosts.m2]
-hostname = "localhost"
-port = 2220
+hostname = "10.0.0.4"
+#hostname = "localhost"
+#port = 2221
+username = "jozias"
 
 [hosts.m3]
-hostname = "localhost"
-port = 2221
+hostname = "10.0.0.5"
+#hostname = "localhost"
+#port = 2222
+username = "jozias"
 
-[hosts.m5]
-hostname = "localhost"
-port = 3222
+[hosts.m4]
+hostname = "10.0.0.60"
+#hostname = "localhost"
+#port = 2223
+username = "jozias"
 
 [hosts.m6]
-hostname = "localhost"
-port = 2223
+hostname = "10.0.0.7"
+#hostname = "localhost"
+#port = 2224
+username = "jozias"
 
-[hosts.tools]
-hostname = "patlv2tools01.int.distco.com"
+[hosts.m7]
+hostname = "10.0.0.226"
+#hostname = "localhost"
+#port = 2225
+username = "jozias"
+
+[hosts.m8]
+hostname = "10.0.0.242"
+#hostname = "localhost"
+#port = 2222
+username = "kon8116"
 
 [cmd.ls]
 command = "ls -al"
 
-[cmd.mrup]
-command = "mrup -l"
-
-[cmd.updall]
-command = "updall -l"
-
 [cmd.uname]
 command = "uname -a"
-
-[cmd.python]
-command = "rub python"
-
-[cmd.atom]
-command = """cdp atom; and git pull; and script/build; \
-           and sudo script/grunt install"""

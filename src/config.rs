@@ -1,5 +1,12 @@
+use failure::{Error, Fallible};
 use serde_derive::{Deserialize, Serialize};
 use std::collections::BTreeMap;
+use std::convert::TryFrom;
+use std::fs::File;
+use std::io::{BufReader, Read};
+use std::path::PathBuf;
+
+crate const MUSSH_CONFIG_FILE_NAME: &str = "mussh.toml";
 
 #[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
 /// The base configuration.
@@ -13,6 +20,17 @@ crate struct Mussh {
     /// A command.
     #[serde(serialize_with = "toml::ser::tables_last")]
     cmd: BTreeMap<String, Command>,
+}
+
+impl TryFrom<PathBuf> for Mussh {
+    type Error = Error;
+
+    fn try_from(path: PathBuf) -> Fallible<Self> {
+        let mut buf_reader = BufReader::new(File::open(path)?);
+        let mut buffer = String::new();
+        let _bytes_read = buf_reader.read_to_string(&mut buffer)?;
+        Ok(toml::from_str(&buffer)?)
+    }
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]

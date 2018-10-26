@@ -43,6 +43,7 @@
 #![doc(html_root_url = "https://docs.rs/mussh/3.0.0")]
 
 mod config;
+mod error;
 mod logging;
 mod run;
 mod subcmd;

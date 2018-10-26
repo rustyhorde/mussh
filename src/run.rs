@@ -1,4 +1,5 @@
 use clap::{App, Arg};
+use crate::config::{Mussh, MUSSH_CONFIG_FILE_NAME};
 use crate::logging::{Loggers, Slogger};
 use crate::subcmd::{Run, SubCmd};
 use failure::Fallible;
@@ -22,15 +23,16 @@ fn base_config_dir() -> Fallible<PathBuf> {
 }
 
 crate fn run() -> Fallible<()> {
-    let path_str = format!("{}", base_config_dir()?.display());
-    let matches = app(&path_str).get_matches_safe()?;
-    let (stdout, stderr) = Loggers::try_from(&matches)?.split();
+    let base_path = base_config_dir()?;
+    let base_path_str = format!("{}", base_path.display());
+    let matches = app(&base_path_str).get_matches_safe()?;
 
-    try_trace!(
-        stdout,
-        "Config Dir: {}",
-        matches.value_of("config").unwrap_or_else(|| "")
-    );
+    let (stdout, stderr) = Loggers::try_from(&matches)?.split();
+    let config_path = PathBuf::from(matches.value_of("config").unwrap_or_else(|| "./"))
+        .join(MUSSH_CONFIG_FILE_NAME);
+    try_trace!(stdout, "Config Dir: {}", config_path.display());
+    let mussh_config = Mussh::try_from(config_path)?;
+    try_trace!(stdout, "{:?}", mussh_config);
 
     match matches.subcommand() {
         // 'cmd' subcommand
@@ -43,6 +45,7 @@ crate fn run() -> Fallible<()> {
         ("run", Some(sub_m)) => Run::try_from(sub_m)?
             .set_stdout(stdout)
             .set_stderr(stderr)
+            .set_config(Some(mussh_config))
             .cmd(),
         (cmd, _) => Err(failure::err_msg(format!("Unknown subcommand {}", cmd))),
     }
