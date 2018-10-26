@@ -23,17 +23,22 @@ fn base_config_dir() -> Fallible<PathBuf> {
 }
 
 crate fn run() -> Fallible<()> {
+    // Setup the default config path for use in clap App
     let base_path = base_config_dir()?;
     let base_path_str = format!("{}", base_path.display());
     let matches = app(&base_path_str).get_matches_safe()?;
 
+    // Setup the slog Loggers
     let (stdout, stderr) = Loggers::try_from(&matches)?.split();
+
+    // Grab the mussh config
     let config_path = PathBuf::from(matches.value_of("config").unwrap_or_else(|| "./"))
         .join(MUSSH_CONFIG_FILE_NAME);
     try_trace!(stdout, "Config Dir: {}", config_path.display());
     let mussh_config = Mussh::try_from(config_path)?;
     try_trace!(stdout, "{:?}", mussh_config);
 
+    // Run, run, run...
     match matches.subcommand() {
         // 'cmd' subcommand
         // ("cmd", Some(sub_m)) => command::cmd(&mut config, sub_m, &stderr),
@@ -46,6 +51,7 @@ crate fn run() -> Fallible<()> {
             .set_stdout(stdout)
             .set_stderr(stderr)
             .set_config(Some(mussh_config))
+            .set_dry_run(matches.is_present("dry_run"))
             .cmd(),
         (cmd, _) => Err(failure::err_msg(format!("Unknown subcommand {}", cmd))),
     }
@@ -64,6 +70,12 @@ fn app<'a, 'b>(default_config_path: &'a str) -> App<'a, 'b> {
                 .help("Specify a path for the TOML config file.")
                 .default_value(default_config_path)
                 .takes_value(true),
+        )
+        .arg(
+            Arg::with_name("dry_run")
+                .short("d")
+                .long("dry_run")
+                .help("Load the configuration and display what would be run"),
         )
         .arg(
             Arg::with_name("verbose")
@@ -94,7 +106,20 @@ mod test {
     #[test]
     fn full_run_subcmd() -> Fallible<()> {
         let app_m = app("").get_matches_from_safe(vec![
-            "mussh", "-vvv", "run", "-c", "python", "nginx", "tmux", "-h", "all", "!m8", "-s",
+            "mussh",
+            "-vvv",
+            "-c",
+            "test_cfg",
+            "--dry_run",
+            "run",
+            "-c",
+            "python",
+            "nginx",
+            "tmux",
+            "-h",
+            "all",
+            "!m8",
+            "-s",
         ])?;
 
         if let ("run", Some(sub_m)) = app_m.subcommand() {

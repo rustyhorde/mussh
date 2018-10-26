@@ -1,4 +1,5 @@
 use failure::{Error, Fallible};
+use getset::Getters;
 use serde_derive::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::convert::TryFrom;
@@ -8,11 +9,12 @@ use std::path::PathBuf;
 
 crate const MUSSH_CONFIG_FILE_NAME: &str = "mussh.toml";
 
-#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, Default, Deserialize, Eq, Getters, PartialEq, Serialize)]
 /// The base configuration.
 crate struct Mussh {
     /// A list of hosts.
     #[serde(serialize_with = "toml::ser::tables_last")]
+    #[get = "pub"]
     hostlist: BTreeMap<String, Hosts>,
     /// The hosts.
     #[serde(serialize_with = "toml::ser::tables_last")]
@@ -33,17 +35,19 @@ impl TryFrom<PathBuf> for Mussh {
     }
 }
 
-#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, Default, Deserialize, Eq, Getters, PartialEq, Serialize)]
 /// hosts configuration
 crate struct Hosts {
     /// The hostnames.
+    #[get = "pub"]
     hostnames: Vec<String>,
 }
 
-#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, Default, Deserialize, Eq, Getters, PartialEq, Serialize)]
 /// Host configuration.
 crate struct Host {
     /// A hostname.
+    #[get = "pub"]
     hostname: String,
     /// A pem key.
     pem: Option<String>,
