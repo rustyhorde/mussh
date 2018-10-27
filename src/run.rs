@@ -34,7 +34,7 @@ crate fn run() -> Fallible<()> {
     // Grab the mussh config
     let config_path = PathBuf::from(matches.value_of("config").unwrap_or_else(|| "./"))
         .join(MUSSH_CONFIG_FILE_NAME);
-    try_trace!(stdout, "Config Dir: {}", config_path.display());
+    try_trace!(stdout, "Config Path: {}", config_path.display());
     let mussh_config = Mussh::try_from(config_path)?;
     try_trace!(stdout, "{:?}", mussh_config);
 

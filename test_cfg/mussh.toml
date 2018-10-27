@@ -1,11 +1,11 @@
 [hostlist.all]
-hostnames = ["m1", "m2", "m3", "m4", "m5", "m6", "m7", "m8", "lh"]
+hostnames = ["m1", "m2", "m3", "m4", "m6", "m7", "m8", "local"]
 
 [hostlist.i686]
 hostnames = ["m1", "m2", "m3"]
 
 [hostlist.local]
-hostnames = ["lh"]
+hostnames = ["local"]
 
 [hostlist.m1]
 hostnames = ["m1"]
@@ -19,9 +19,6 @@ hostnames = ["m3"]
 [hostlist.m4]
 hostnames = ["m4"]
 
-[hostlist.m5]
-hostnames = ["m5"]
-
 [hostlist.m6]
 hostnames = ["m6"]
 
@@ -32,12 +29,12 @@ hostnames = ["m7"]
 hostnames = ["m8"]
 
 [hostlist.most]
-hostnames = ["m1", "m2", "m3", "m4", "m5", "m6", "m8", "lh"]
+hostnames = ["m1", "m2", "m3", "m4", "m6", "m8", "local"]
 
 [hostlist.x86_64]
-hostnames = ["lh", "m4", "m5", "m6", "m7", "m8"]
+hostnames = ["local", "m4", "m6", "m7", "m8"]
 
-[hosts.lh]
+[hosts.local]
 hostname = "localhost"
 username = "jozias"
 
