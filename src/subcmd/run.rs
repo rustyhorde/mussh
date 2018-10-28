@@ -285,10 +285,47 @@ impl SubCmd for Run {
 }
 
 fn convert_duration(duration: Duration) -> String {
-    if duration.as_secs() < 1 {
-        format!("{}ms", duration.as_millis())
+    let seconds = duration.as_secs();
+    let millis = duration.subsec_millis();
+    if seconds < 1 {
+        format!("00:00:00.{:03}", duration.as_millis())
+    } else if seconds < 60 {
+        format!("00:00:{:02}.{}", seconds, millis)
+    } else if seconds < 3600 {
+        let minutes = seconds / 60;
+        let seconds = seconds % 60;
+        format!("00:{:02}:{:02}.{}", minutes, seconds, millis)
+    } else if seconds < 86400 {
+        let total_minutes = seconds / 60;
+        let seconds = seconds % 60;
+        let hours = total_minutes / 60;
+        let minutes = total_minutes % 60;
+        format!("{}:{:02}:{:02}.{:03}", hours, minutes, seconds, millis)
     } else {
-        format!("{}.{}s", duration.as_secs(), duration.subsec_millis())
+        format!("{}s", seconds)
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::convert_duration;
+    use std::time::Duration;
+
+    #[test]
+    fn conversions() {
+        assert_eq!(convert_duration(Duration::from_millis(876)), "00:00:00.876");
+        assert_eq!(
+            convert_duration(Duration::from_millis(10432)),
+            "00:00:10.432"
+        );
+        assert_eq!(
+            convert_duration(Duration::from_millis(2_421_132)),
+            "00:40:21.132"
+        );
+        assert_eq!(
+            convert_duration(Duration::from_millis(12_423_756)),
+            "3:27:03.756"
+        );
     }
 }
 
