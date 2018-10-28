@@ -12,6 +12,7 @@ repository = "https://github.com/rustyhorde/mussh"
 version = "3.0.0"
 
 [dependencies]
+chrono = "0"
 clap = "2"
 dirs = "1"
 getset = "0"

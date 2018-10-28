@@ -18,9 +18,11 @@ crate struct Mussh {
     hostlist: BTreeMap<String, Hosts>,
     /// The hosts.
     #[serde(serialize_with = "toml::ser::tables_last")]
+    #[get = "pub"]
     hosts: BTreeMap<String, Host>,
     /// A command.
     #[serde(serialize_with = "toml::ser::tables_last")]
+    #[get = "pub"]
     cmd: BTreeMap<String, Command>,
 }
 
@@ -50,27 +52,34 @@ crate struct Host {
     #[get = "pub"]
     hostname: String,
     /// A pem key.
+    #[get = "pub"]
     pem: Option<String>,
     /// A port
+    #[get = "pub"]
     port: Option<u16>,
     /// A username.
+    #[get = "pub"]
     username: String,
     /// A command alias.
+    #[get = "pub"]
     alias: Option<Vec<Alias>>,
 }
 
-#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, Default, Deserialize, Eq, Getters, PartialEq, Serialize)]
 /// command configuration
 crate struct Command {
     /// A Command.
+    #[get = "pub"]
     command: String,
 }
 
-#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
+#[derive(Clone, Debug, Default, Deserialize, Eq, Getters, PartialEq, Serialize)]
 /// command alias configuration.
 crate struct Alias {
     /// A command alias.
+    #[get = "pub"]
     command: String,
     /// The command this is an alias for.
+    #[get = "pub"]
     aliasfor: String,
 }

@@ -7,7 +7,7 @@
 // modified, or distributed except according to those terms.
 
 //! mussh - SSH Multiplexing
-#![feature(crate_visibility_modifier, try_from)]
+#![feature(crate_visibility_modifier, duration_as_u128, try_from)]
 #![deny(
     clippy::all,
     clippy::pedantic,

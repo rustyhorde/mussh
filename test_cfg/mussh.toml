@@ -78,8 +78,15 @@ hostname = "10.0.0.242"
 #port = 2222
 username = "kon8116"
 
+[[hosts.m8.alias]]
+command = "ls.mac"
+aliasfor = "ls"
+
 [cmd.ls]
 command = "ls -al"
+
+[cmd."ls.mac"]
+command = "ls -alF"
 
 [cmd.uname]
 command = "uname -a"
