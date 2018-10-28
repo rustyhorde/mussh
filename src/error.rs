@@ -10,6 +10,10 @@ crate struct MusshError {
 crate enum MusshErrorKind {
     #[fail(display = "The TOML configuration is invalid")]
     InvalidConfigToml,
+    #[fail(display = "Failed to establish SSH session")]
+    SshSession,
+    #[fail(display = "Failed to authenticate for SSH session")]
+    SshAuthentication,
 }
 
 impl Fail for MusshError {

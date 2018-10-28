@@ -23,6 +23,7 @@ slog-async = "2"
 slog-term = "2"
 slog-try = "0"
 toml = "0"
+ssh2 = "0.3.3"
 
 [dependencies.slog]
 features = ["max_level_trace", "release_max_level_trace"]

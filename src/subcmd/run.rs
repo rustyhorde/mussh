@@ -7,11 +7,13 @@ use failure::{Error, Fallible};
 use getset::{Getters, Setters};
 use slog::{error, info, o, trace, warn, Drain, Logger};
 use slog_try::{try_error, try_info, try_trace, try_warn};
+use ssh2::Session;
 use std::collections::{BTreeMap, HashSet};
 use std::convert::TryFrom;
 use std::io::{BufRead, BufReader};
 use std::iter::FromIterator;
-use std::path::PathBuf;
+use std::net::TcpStream;
+use std::path::{Path, PathBuf};
 use std::process::{Command as Cmd, Stdio};
 use std::sync::mpsc;
 use std::thread;
@@ -163,29 +165,30 @@ impl Run {
         if let Some(config) = self.config() {
             Ok(expected_cmds
                 .iter()
-                .map(|(cmd_name, command)| {
-                    (
-                        cmd_name.clone(),
-                        if let Some(alias_vec) = target_host.alias() {
-                            let mut cmd = command.command().clone();
-                            for alias in alias_vec {
-                                if alias.aliasfor() == cmd_name {
-                                    if let Some(int_command) = config.cmd().get(alias.command()) {
-                                        cmd = int_command.command().clone();
-                                        break;
-                                    }
-                                }
-                            }
-                            cmd
-                        } else {
-                            command.command().clone()
-                        },
-                    )
-                })
+                .map(|(cmd_name, command)| setup_alias(config, command, cmd_name, target_host))
                 .collect())
         } else {
             Err(MusshErrorKind::InvalidConfigToml.into())
         }
+    }
+
+    fn host_file_logger(&self, hostname: &str) -> Fallible<Logger> {
+        let mut host_file_path = if let Some(mut config_dir) = dirs::config_dir() {
+            config_dir.push(env!("CARGO_PKG_NAME"));
+            config_dir
+        } else {
+            PathBuf::new()
+        };
+
+        host_file_path.push(hostname);
+        let _ = host_file_path.set_extension("log");
+
+        try_trace!(self.stdout, "Log Path: {}", host_file_path.display());
+
+        let file_drain = FileDrain::try_from(host_file_path)?;
+        let async_file_drain = slog_async::Async::new(file_drain).build().fuse();
+        let file_logger = Logger::root(async_file_drain, o!());
+        Ok(file_logger)
     }
 }
 
@@ -249,15 +252,19 @@ impl SubCmd for Run {
                 hostname
             );
 
+            let file_logger = self.host_file_logger(&hostname)?;
+
             if !self.dry_run {
                 let h_tx = tx.clone();
                 let stdout_t = self.stdout.clone();
                 let stderr_t = self.stdout.clone();
+                let file_logger_t = file_logger.clone();
+
                 let _ = thread::spawn(move || {
                     h_tx.send(execute(
                         &stdout_t,
                         &stderr_t,
-                        &hostname,
+                        &file_logger_t,
                         &host,
                         &actual_cmds,
                     ))
@@ -269,9 +276,17 @@ impl SubCmd for Run {
         if !self.dry_run {
             for _ in 0..count {
                 match rx.recv() {
-                    Ok(res) => {
-                        if let Err(e) = res {
-                            try_error!(self.stderr, "{}", e);
+                    Ok(results) => {
+                        for (cmd_name, (hostname, res)) in results {
+                            if let Err(e) = res {
+                                try_error!(
+                                    self.stderr,
+                                    "Failed to run '{}' on '{}': {}",
+                                    cmd_name,
+                                    hostname,
+                                    e
+                                );
+                            }
                         }
                     }
                     Err(e) => {
@@ -282,6 +297,31 @@ impl SubCmd for Run {
         }
         Ok(())
     }
+}
+
+fn setup_alias(
+    config: &Mussh,
+    command: &Command,
+    cmd_name: &str,
+    target_host: &Host,
+) -> (String, String) {
+    (
+        cmd_name.to_string(),
+        if let Some(alias_vec) = target_host.alias() {
+            let mut cmd = command.command().clone();
+            for alias in alias_vec {
+                if alias.aliasfor() == cmd_name {
+                    if let Some(int_command) = config.cmd().get(alias.command()) {
+                        cmd = int_command.command().clone();
+                        break;
+                    }
+                }
+            }
+            cmd
+        } else {
+            command.command().clone()
+        },
+    )
 }
 
 fn convert_duration(duration: Duration) -> String {
@@ -306,6 +346,193 @@ fn convert_duration(duration: Duration) -> String {
     }
 }
 
+fn execute_on_localhost(
+    stdout: &Option<Logger>,
+    stderr: &Option<Logger>,
+    file_logger: &Logger,
+    host: &Host,
+    cmd_name: &str,
+    cmd: &str,
+) -> Fallible<()> {
+    let timer = Instant::now();
+    let mut command = Cmd::new("/usr/bin/fish");
+    let _ = command.arg("-c");
+    let _ = command.arg(cmd);
+    let _ = command.stdout(Stdio::piped());
+    let _ = command.stderr(Stdio::piped());
+
+    if let Ok(mut child) = command.spawn() {
+        let stdout_reader = BufReader::new(child.stdout.take().expect(""));
+        for line in stdout_reader.lines() {
+            if let Ok(line) = line {
+                trace!(file_logger, "{}", line);
+            }
+        }
+
+        let status = child.wait()?;
+        let elapsed_str = convert_duration(timer.elapsed());
+
+        if status.success() {
+            try_info!(
+                stdout,
+                "execute";
+                "host" => host.hostname(),
+                "cmd" => cmd_name,
+                "duration" => elapsed_str
+            );
+        } else {
+            try_error!(
+                stderr,
+                "execute";
+                "host" => host.hostname(),
+                "cmd" => cmd_name,
+                "duration" => elapsed_str
+            );
+        }
+    }
+    Ok(())
+}
+
+fn execute_on_remote(
+    stdout: &Option<Logger>,
+    stderr: &Option<Logger>,
+    file_logger: &Logger,
+    host: &Host,
+    cmd_name: &str,
+    cmd: &str,
+) -> Fallible<()> {
+    if let Some(mut sess) = Session::new() {
+        let timer = Instant::now();
+        let host_tuple = (&host.hostname()[..], host.port().unwrap_or_else(|| 22));
+        let tcp = TcpStream::connect(host_tuple)?;
+        sess.handshake(&tcp)?;
+        if let Some(pem) = host.pem() {
+            sess.userauth_pubkey_file(host.username(), None, Path::new(&pem), None)?;
+        } else {
+            try_trace!(stdout, "execute"; "message" => "Agent Auth Setup", "username" => host.username());
+            let mut agent = sess.agent()?;
+            agent.connect()?;
+            agent.list_identities()?;
+            for identity in agent.identities() {
+                if let Ok(ref id) = identity {
+                    if agent.userauth(host.username(), id).is_ok() {
+                        break;
+                    }
+                }
+            }
+            agent.disconnect()?;
+        }
+
+        if sess.authenticated() {
+            try_trace!(stdout, "execute"; "message" => "Authenticated");
+            let mut channel = sess.channel_session()?;
+            channel.exec(cmd)?;
+
+            {
+                let stdout_stream = channel.stream(0);
+                let stdout_reader = BufReader::new(stdout_stream);
+
+                for line in stdout_reader.lines() {
+                    if let Ok(line) = line {
+                        trace!(file_logger, "{}", line);
+                    }
+                }
+            }
+
+            let elapsed_str = convert_duration(timer.elapsed());
+            match channel.exit_status() {
+                Ok(code) => {
+                    if code == 0 {
+                        try_info!(
+                            stdout,
+                            "execute";
+                            "host" => host.hostname(),
+                            "cmd" => cmd_name,
+                            "duration" => elapsed_str
+                        );
+                        Ok(())
+                    } else {
+                        try_error!(
+                            stderr,
+                            "execute";
+                            "host" => host.hostname(),
+                            "cmd" => cmd_name,
+                            "duration" => elapsed_str
+                        );
+                        Err(failure::err_msg("ssh cmd failed"))
+                    }
+                }
+                Err(e) => {
+                    try_error!(
+                        stderr,
+                        "execute"; "hostname" => host.hostname(), "cmd" => cmd_name, "error" => format!("{}", e)
+                    );
+                    Err(e.into())
+                }
+            }
+        } else {
+            Err(MusshErrorKind::SshAuthentication.into())
+        }
+    } else {
+        Err(MusshErrorKind::SshSession.into())
+    }
+}
+
+fn execute_on_host(
+    stdout: &Option<Logger>,
+    stderr: &Option<Logger>,
+    file_logger: &Logger,
+    host: &Host,
+    cmd_name: &str,
+    cmd: &str,
+) -> Fallible<()> {
+    if host.hostname() == "localhost" {
+        execute_on_localhost(stdout, stderr, file_logger, host, cmd_name, cmd)
+    } else {
+        execute_on_remote(stdout, stderr, file_logger, host, cmd_name, cmd)
+    }
+}
+
+fn execute(
+    stdout: &Option<Logger>,
+    stderr: &Option<Logger>,
+    file_logger: &Logger,
+    host: &Host,
+    cmds: &BTreeMap<String, String>,
+) -> BTreeMap<String, (String, Fallible<()>)> {
+    cmds.iter()
+        .map(|(cmd_name, cmd)| {
+            (
+                cmd_name.clone(),
+                (
+                    host.hostname().clone(),
+                    execute_on_host(stdout, stderr, file_logger, host, cmd_name, cmd),
+                ),
+            )
+        })
+        .collect()
+}
+
+impl<'a> TryFrom<&'a ArgMatches<'a>> for Run {
+    type Error = Error;
+
+    fn try_from(matches: &'a ArgMatches<'a>) -> Fallible<Self> {
+        let mut run = Self::default();
+        run.commands = matches
+            .values_of("commands")
+            .ok_or_else(|| failure::err_msg("No commands found to run!"))?
+            .map(|s| s.to_string())
+            .collect();
+        run.hosts = matches
+            .values_of("hosts")
+            .ok_or_else(|| failure::err_msg("No commands found to run!"))?
+            .map(|s| s.to_string())
+            .collect();
+        run.sync = matches.is_present("sync");
+        Ok(run)
+    }
+}
+
 #[cfg(test)]
 mod test {
     use super::convert_duration;
@@ -326,93 +553,5 @@ mod test {
             convert_duration(Duration::from_millis(12_423_756)),
             "3:27:03.756"
         );
-    }
-}
-
-fn execute(
-    stdout: &Option<Logger>,
-    stderr: &Option<Logger>,
-    hostname: &str,
-    host: &Host,
-    cmds: &BTreeMap<String, String>,
-) -> Fallible<()> {
-    let mut host_file_path = if let Some(mut config_dir) = dirs::config_dir() {
-        config_dir.push(env!("CARGO_PKG_NAME"));
-        config_dir
-    } else {
-        PathBuf::new()
-    };
-
-    host_file_path.push(hostname);
-    let _ = host_file_path.set_extension("log");
-
-    try_trace!(stdout, "Log Path: {}", host_file_path.display());
-
-    let file_drain = FileDrain::try_from(host_file_path)?;
-    let async_file_drain = slog_async::Async::new(file_drain).build().fuse();
-    let file_logger = Logger::root(async_file_drain, o!());
-    let timer = Instant::now();
-
-    if host.hostname() == "localhost" {
-        for (cmd_name, cmd) in cmds {
-            let mut command = Cmd::new("/usr/bin/fish");
-            let _ = command.arg("-c");
-            let _ = command.arg(cmd);
-            let _ = command.stdout(Stdio::piped());
-            let _ = command.stderr(Stdio::piped());
-
-            if let Ok(mut child) = command.spawn() {
-                let stdout_reader = BufReader::new(child.stdout.take().expect(""));
-                for line in stdout_reader.lines() {
-                    if let Ok(line) = line {
-                        trace!(file_logger, "{}", line);
-                    }
-                }
-
-                let status = child.wait()?;
-                let elapsed_str = convert_duration(timer.elapsed());
-
-                if status.success() {
-                    try_info!(
-                        stdout,
-                        "execute";
-                        "host" => host.hostname(),
-                        "cmd" => cmd_name,
-                        "duration" => elapsed_str
-                    );
-                } else {
-                    try_error!(
-                        stderr,
-                        "execute";
-                        "host" => host.hostname(),
-                        "cmd" => cmd_name,
-                        "duration" => elapsed_str
-                    );
-                }
-            }
-        }
-        Ok(())
-    } else {
-        Err(failure::err_msg("not implemented!"))
-    }
-}
-
-impl<'a> TryFrom<&'a ArgMatches<'a>> for Run {
-    type Error = Error;
-
-    fn try_from(matches: &'a ArgMatches<'a>) -> Fallible<Self> {
-        let mut run = Self::default();
-        run.commands = matches
-            .values_of("commands")
-            .ok_or_else(|| failure::err_msg("No commands found to run!"))?
-            .map(|s| s.to_string())
-            .collect();
-        run.hosts = matches
-            .values_of("hosts")
-            .ok_or_else(|| failure::err_msg("No commands found to run!"))?
-            .map(|s| s.to_string())
-            .collect();
-        run.sync = matches.is_present("sync");
-        Ok(run)
     }
 }
