@@ -10,6 +10,7 @@ use slog::{error, info, o, trace, warn, Drain, Logger};
 use slog_try::{try_error, try_info, try_trace, try_warn};
 use ssh2::Session;
 use std::convert::TryFrom;
+use std::env;
 use std::io::{BufRead, BufReader};
 use std::iter::FromIterator;
 use std::net::TcpStream;
@@ -373,6 +374,25 @@ fn convert_duration(duration: Duration) -> String {
     }
 }
 
+#[allow(dead_code)]
+fn which<P>(exe_name: P) -> Option<PathBuf>
+where
+    P: AsRef<Path>,
+{
+    env::var_os("PATH").and_then(|paths| {
+        env::split_paths(&paths)
+            .filter_map(|dir| {
+                let full_path = dir.join(&exe_name);
+                if full_path.is_file() {
+                    Some(full_path)
+                } else {
+                    None
+                }
+            })
+            .next()
+    })
+}
+
 fn execute_on_localhost(
     stdout: &Option<Logger>,
     stderr: &Option<Logger>,
@@ -381,43 +401,48 @@ fn execute_on_localhost(
     cmd_name: &str,
     cmd: &str,
 ) -> Fallible<()> {
-    let timer = Instant::now();
-    let mut command = Cmd::new("/usr/bin/fish");
-    let _ = command.arg("-c");
-    let _ = command.arg(cmd);
-    let _ = command.stdout(Stdio::piped());
-    let _ = command.stderr(Stdio::piped());
+    if let Some(shell_path) = env::var_os("SHELL") {
+        let timer = Instant::now();
+        let fish = shell_path.to_string_lossy().to_string();
+        let mut command = Cmd::new(&fish);
+        let _ = command.arg("-c");
+        let _ = command.arg(cmd);
+        let _ = command.stdout(Stdio::piped());
+        let _ = command.stderr(Stdio::piped());
 
-    if let Ok(mut child) = command.spawn() {
-        let stdout_reader = BufReader::new(child.stdout.take().expect(""));
-        for line in stdout_reader.lines() {
-            if let Ok(line) = line {
-                trace!(file_logger, "{}", line);
+        if let Ok(mut child) = command.spawn() {
+            let stdout_reader = BufReader::new(child.stdout.take().expect(""));
+            for line in stdout_reader.lines() {
+                if let Ok(line) = line {
+                    trace!(file_logger, "{}", line);
+                }
             }
-        }
 
-        let status = child.wait()?;
-        let elapsed_str = convert_duration(timer.elapsed());
+            let status = child.wait()?;
+            let elapsed_str = convert_duration(timer.elapsed());
 
-        if status.success() {
-            try_info!(
+            if status.success() {
+                try_info!(
                 stdout,
                 "execute";
                 "host" => host.hostname(),
                 "cmd" => cmd_name,
                 "duration" => elapsed_str
             );
-        } else {
-            try_error!(
+            } else {
+                try_error!(
                 stderr,
                 "execute";
                 "host" => host.hostname(),
                 "cmd" => cmd_name,
                 "duration" => elapsed_str
             );
+            }
         }
+        Ok(())
+    } else {
+        Err(MusshErrorKind::ShellNotFound.into())
     }
-    Ok(())
 }
 
 fn execute_on_remote(

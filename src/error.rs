@@ -14,6 +14,8 @@ crate enum MusshErrorKind {
     SshSession,
     #[fail(display = "Failed to authenticate for SSH session")]
     SshAuthentication,
+    #[fail(display = "Failed to find a carshell to execute locally")]
+    ShellNotFound,
 }
 
 impl Fail for MusshError {
