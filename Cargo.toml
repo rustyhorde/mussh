@@ -15,15 +15,16 @@ version = "3.0.0"
 chrono = "0"
 clap = "2"
 dirs = "1"
-getset = "0"
 failure = "0"
+getset = "0"
+indexmap = "1"
 serde = "1"
 serde_derive = "1"
 slog-async = "2"
 slog-term = "2"
 slog-try = "0"
+ssh2 = "0"
 toml = "0"
-ssh2 = "0.3.3"
 
 [dependencies.slog]
 features = ["max_level_trace", "release_max_level_trace"]

@@ -5,10 +5,10 @@ use crate::logging::{FileDrain, Slogger};
 use crate::subcmd::SubCmd;
 use failure::{Error, Fallible};
 use getset::{Getters, Setters};
+use indexmap::{IndexMap, IndexSet};
 use slog::{error, info, o, trace, warn, Drain, Logger};
 use slog_try::{try_error, try_info, try_trace, try_warn};
 use ssh2::Session;
-use std::collections::{BTreeMap, HashSet};
 use std::convert::TryFrom;
 use std::io::{BufRead, BufReader};
 use std::iter::FromIterator;
@@ -56,7 +56,7 @@ enum WarnType {
 }
 
 impl Run {
-    fn display_set(&self, label: &str, hash_set: &HashSet<String>, warn_type: &Option<WarnType>) {
+    fn display_set(&self, label: &str, hash_set: &IndexSet<String>, warn_type: &Option<WarnType>) {
         let set_str = hash_set.iter().cloned().collect::<Vec<String>>().join(", ");
 
         if warn_type.is_none() {
@@ -76,26 +76,26 @@ impl Run {
         }
     }
 
-    fn target_hosts(&self) -> Fallible<BTreeMap<String, Host>> {
+    fn target_hosts(&self) -> Fallible<IndexMap<String, Host>> {
         if let Some(config) = self.config() {
-            let requested_hosts: HashSet<String> = HashSet::from_iter(self.hosts.iter().cloned());
+            let requested_hosts: IndexSet<String> = IndexSet::from_iter(self.hosts.iter().cloned());
             self.display_set("Command Line Hosts:      ", &requested_hosts, &None);
 
-            let mut expanded_hosts: HashSet<String> =
-                HashSet::from_iter(self.hosts.iter().flat_map(|host| hostnames(config, host)));
+            let mut expanded_hosts: IndexSet<String> =
+                IndexSet::from_iter(self.hosts.iter().flat_map(|host| hostnames(config, host)));
             self.display_set("Expanded Hosts:          ", &expanded_hosts, &None);
 
-            let remove_unwanted: HashSet<String> =
-                HashSet::from_iter(self.hosts.iter().filter_map(|host| unwanted_host(host)));
+            let remove_unwanted: IndexSet<String> =
+                IndexSet::from_iter(self.hosts.iter().filter_map(|host| unwanted_host(host)));
             self.display_set("Unwanted Hosts:          ", &remove_unwanted, &None);
 
             expanded_hosts.retain(|x| !remove_unwanted.contains(x));
 
-            let configured_hosts: HashSet<String> =
-                HashSet::from_iter(config.hostlist().keys().cloned());
+            let configured_hosts: IndexSet<String> =
+                IndexSet::from_iter(config.hostlist().keys().cloned());
             self.display_set("Configured Hosts:        ", &configured_hosts, &None);
 
-            let not_configured_hosts: HashSet<String> = expanded_hosts
+            let not_configured_hosts: IndexSet<String> = expanded_hosts
                 .difference(&configured_hosts)
                 .cloned()
                 .collect();
@@ -105,7 +105,7 @@ impl Run {
                 self.display_set("", &not_configured_hosts, &Some(WarnType::Hosts));
             }
 
-            let matched_hosts: BTreeMap<String, Host> = expanded_hosts
+            let matched_hosts: IndexMap<String, Host> = expanded_hosts
                 .intersection(&configured_hosts)
                 .filter_map(|hostname| {
                     if let Some(host) = config.hosts().get(hostname) {
@@ -122,15 +122,17 @@ impl Run {
         }
     }
 
-    fn target_cmds(&self) -> Fallible<BTreeMap<String, Command>> {
+    fn target_cmds(&self) -> Fallible<IndexMap<String, Command>> {
         if let Some(config) = self.config() {
-            let requested_cmds: HashSet<String> = HashSet::from_iter(self.commands.iter().cloned());
+            let requested_cmds: IndexSet<String> =
+                IndexSet::from_iter(self.commands.iter().cloned());
             self.display_set("Command Line Commands:   ", &requested_cmds, &None);
 
-            let configured_cmds: HashSet<String> = HashSet::from_iter(config.cmd().keys().cloned());
+            let configured_cmds: IndexSet<String> =
+                IndexSet::from_iter(config.cmd().keys().cloned());
             self.display_set("Configured Commands:     ", &configured_cmds, &None);
 
-            let not_configured_commands: HashSet<String> = requested_cmds
+            let not_configured_commands: IndexSet<String> = requested_cmds
                 .difference(&configured_cmds)
                 .cloned()
                 .collect();
@@ -140,7 +142,7 @@ impl Run {
                 self.display_set("", &not_configured_commands, &Some(WarnType::Cmds));
             }
 
-            let matched_cmds: BTreeMap<String, Command> = requested_cmds
+            let matched_cmds: IndexMap<String, Command> = requested_cmds
                 .intersection(&configured_cmds)
                 .filter_map(|cmd_name| {
                     if let Some(cmd) = config.cmd().get(cmd_name) {
@@ -160,8 +162,8 @@ impl Run {
     fn actual_cmds(
         &self,
         target_host: &Host,
-        expected_cmds: &BTreeMap<String, Command>,
-    ) -> Fallible<BTreeMap<String, String>> {
+        expected_cmds: &IndexMap<String, Command>,
+    ) -> Fallible<IndexMap<String, String>> {
         if let Some(config) = self.config() {
             Ok(expected_cmds
                 .iter()
@@ -243,12 +245,16 @@ impl SubCmd for Run {
         let (tx, rx) = mpsc::channel();
 
         for (hostname, host) in target_hosts {
-            let actual_cmds: BTreeMap<String, String> = self.actual_cmds(&host, &cmds)?;
+            let actual_cmds: IndexMap<String, String> = self.actual_cmds(&host, &cmds)?;
 
             try_trace!(
                 self.stdout,
-                "Executing {:?} on {}",
-                actual_cmds.keys(),
+                "Executing {} on {}",
+                actual_cmds
+                    .keys()
+                    .cloned()
+                    .collect::<Vec<String>>()
+                    .join(","),
                 hostname
             );
 
@@ -271,9 +277,30 @@ impl SubCmd for Run {
                     .expect("Unable to send response!");
                 });
             }
+
+            if self.sync {
+                match rx.recv() {
+                    Ok(results) => {
+                        for (cmd_name, (hostname, res)) in results {
+                            if let Err(e) = res {
+                                try_error!(
+                                    self.stderr,
+                                    "Failed to run '{}' on '{}': {}",
+                                    cmd_name,
+                                    hostname,
+                                    e
+                                );
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        try_error!(self.stderr, "{}", e);
+                    }
+                }
+            }
         }
 
-        if !self.dry_run {
+        if !self.dry_run && !self.sync {
             for _ in 0..count {
                 match rx.recv() {
                     Ok(results) => {
@@ -330,11 +357,11 @@ fn convert_duration(duration: Duration) -> String {
     if seconds < 1 {
         format!("00:00:00.{:03}", duration.as_millis())
     } else if seconds < 60 {
-        format!("00:00:{:02}.{}", seconds, millis)
+        format!("00:00:{:02}.{:03}", seconds, millis)
     } else if seconds < 3600 {
         let minutes = seconds / 60;
         let seconds = seconds % 60;
-        format!("00:{:02}:{:02}.{}", minutes, seconds, millis)
+        format!("00:{:02}:{:02}.{:03}", minutes, seconds, millis)
     } else if seconds < 86400 {
         let total_minutes = seconds / 60;
         let seconds = seconds % 60;
@@ -498,8 +525,8 @@ fn execute(
     stderr: &Option<Logger>,
     file_logger: &Logger,
     host: &Host,
-    cmds: &BTreeMap<String, String>,
-) -> BTreeMap<String, (String, Fallible<()>)> {
+    cmds: &IndexMap<String, String>,
+) -> IndexMap<String, (String, Fallible<()>)> {
     cmds.iter()
         .map(|(cmd_name, cmd)| {
             (
