@@ -23,7 +23,9 @@ use std::time::{Duration, Instant};
 #[derive(Clone, Debug, Default, Getters, Setters)]
 crate struct Run {
     commands: Vec<String>,
-    hosts: Vec<String>,
+    #[get = "pub"]
+    hosts: Option<Vec<String>>,
+    groups: Option<Vec<String>>,
     sync: bool,
     stdout: Option<Logger>,
     stderr: Option<Logger>,
@@ -79,45 +81,49 @@ impl Run {
 
     fn target_hosts(&self) -> Fallible<IndexMap<String, Host>> {
         if let Some(config) = self.config() {
-            let requested_hosts: IndexSet<String> = IndexSet::from_iter(self.hosts.iter().cloned());
-            self.display_set("Command Line Hosts:      ", &requested_hosts, &None);
+            if let Some(hosts) = self.hosts() {
+                let requested_hosts: IndexSet<String> = IndexSet::from_iter(hosts.iter().cloned());
+                self.display_set("Command Line Hosts:      ", &requested_hosts, &None);
 
-            let mut expanded_hosts: IndexSet<String> =
-                IndexSet::from_iter(self.hosts.iter().flat_map(|host| hostnames(config, host)));
-            self.display_set("Expanded Hosts:          ", &expanded_hosts, &None);
+                let mut expanded_hosts: IndexSet<String> =
+                    IndexSet::from_iter(hosts.iter().flat_map(|host| hostnames(config, host)));
+                self.display_set("Expanded Hosts:          ", &expanded_hosts, &None);
 
-            let remove_unwanted: IndexSet<String> =
-                IndexSet::from_iter(self.hosts.iter().filter_map(|host| unwanted_host(host)));
-            self.display_set("Unwanted Hosts:          ", &remove_unwanted, &None);
+                let remove_unwanted: IndexSet<String> =
+                    IndexSet::from_iter(hosts.iter().filter_map(|host| unwanted_host(host)));
+                self.display_set("Unwanted Hosts:          ", &remove_unwanted, &None);
 
-            expanded_hosts.retain(|x| !remove_unwanted.contains(x));
+                expanded_hosts.retain(|x| !remove_unwanted.contains(x));
 
-            let configured_hosts: IndexSet<String> =
-                IndexSet::from_iter(config.hostlist().keys().cloned());
-            self.display_set("Configured Hosts:        ", &configured_hosts, &None);
+                let configured_hosts: IndexSet<String> =
+                    IndexSet::from_iter(config.hostlist().keys().cloned());
+                self.display_set("Configured Hosts:        ", &configured_hosts, &None);
 
-            let not_configured_hosts: IndexSet<String> = expanded_hosts
-                .difference(&configured_hosts)
-                .cloned()
-                .collect();
-            self.display_set("Not Configured Hosts:    ", &not_configured_hosts, &None);
+                let not_configured_hosts: IndexSet<String> = expanded_hosts
+                    .difference(&configured_hosts)
+                    .cloned()
+                    .collect();
+                self.display_set("Not Configured Hosts:    ", &not_configured_hosts, &None);
 
-            if !not_configured_hosts.is_empty() {
-                self.display_set("", &not_configured_hosts, &Some(WarnType::Hosts));
+                if !not_configured_hosts.is_empty() {
+                    self.display_set("", &not_configured_hosts, &Some(WarnType::Hosts));
+                }
+
+                let matched_hosts: IndexMap<String, Host> = expanded_hosts
+                    .intersection(&configured_hosts)
+                    .filter_map(|hostname| {
+                        if let Some(host) = config.hosts().get(hostname) {
+                            Some((hostname.clone(), host.clone()))
+                        } else {
+                            None
+                        }
+                    })
+                    .collect();
+
+                Ok(matched_hosts)
+            } else {
+                Err(MusshErrorKind::InvalidConfigToml.into())
             }
-
-            let matched_hosts: IndexMap<String, Host> = expanded_hosts
-                .intersection(&configured_hosts)
-                .filter_map(|hostname| {
-                    if let Some(host) = config.hosts().get(hostname) {
-                        Some((hostname.clone(), host.clone()))
-                    } else {
-                        None
-                    }
-                })
-                .collect();
-
-            Ok(matched_hosts)
         } else {
             Err(MusshErrorKind::InvalidConfigToml.into())
         }
@@ -231,7 +237,17 @@ impl SubCmd for Run {
                     .value_name("HOSTS")
                     .help("The hosts to multiplex the command over")
                     .multiple(true)
-                    .required(true),
+                    .required_unless("group"),
+            )
+            .arg(
+                Arg::with_name("group")
+                    .short("g")
+                    .long("group")
+                    .value_name("GROUP")
+                    .help("A group of hosts to multiplex the command over")
+                    .multiple(true)
+                    .conflicts_with("hosts")
+                    .required_unless("hosts"),
             )
             .arg(Arg::with_name("sync").short("s").long("sync").help(
                 "Run the given commadn synchronously across the \
@@ -577,9 +593,10 @@ impl<'a> TryFrom<&'a ArgMatches<'a>> for Run {
             .collect();
         run.hosts = matches
             .values_of("hosts")
-            .ok_or_else(|| failure::err_msg("No commands found to run!"))?
-            .map(|s| s.to_string())
-            .collect();
+            .and_then(|values| Some(values.map(|v| v.to_string()).collect()));
+        run.groups = matches
+            .values_of("groups")
+            .and_then(|values| Some(values.map(|v| v.to_string()).collect()));
         run.sync = matches.is_present("sync");
         Ok(run)
     }
