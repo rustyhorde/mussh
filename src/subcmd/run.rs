@@ -228,7 +228,7 @@ impl SubCmd for Run {
                     .value_name("CMD")
                     .help("The commands to multiplex")
                     .multiple(true)
-                    .required(true),
+                    .required_unless("group_cmds"),
             )
             .arg(
                 Arg::with_name("hosts")
@@ -240,14 +240,29 @@ impl SubCmd for Run {
                     .required_unless("group"),
             )
             .arg(
+                Arg::with_name("group_cmds")
+                    .long("group-cmds")
+                    .value_name("GROUP_CMDS")
+                    .help("The commands to multiplex after completing on the pre-group")
+                    .use_delimiter(true)
+                    .required_unless("hosts")
+                    .requires_all(&["group_pre", "group"])
+            )
+            .arg(
+                Arg::with_name("group_pre")
+                    .long("group-pre")
+                    .value_name("GROUP_PRE")
+                    .help("The group of hosts that should complete before moving on to the hosts specified by the 'group' flag")
+                    .use_delimiter(true)
+                    .requires("group_cmds")
+            )
+            .arg(
                 Arg::with_name("group")
-                    .short("g")
                     .long("group")
                     .value_name("GROUP")
-                    .help("A group of hosts to multiplex the command over")
-                    .multiple(true)
-                    .conflicts_with("hosts")
-                    .required_unless("hosts"),
+                    .help("The group of hosts that should run after the hosts specified by the 'group-pre' flag")
+                    .use_delimiter(true)
+                    .requires("group_cmds")
             )
             .arg(Arg::with_name("sync").short("s").long("sync").help(
                 "Run the given commadn synchronously across the \

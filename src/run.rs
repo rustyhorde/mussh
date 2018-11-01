@@ -120,6 +120,12 @@ mod test {
             "all",
             "!m8",
             "-s",
+            "--group-cmds",
+            "bar",
+            "--group-pre",
+            "m4",
+            "--group",
+            "m1,m2,m3,local,m6,m8",
         ])?;
 
         if let ("run", Some(sub_m)) = app_m.subcommand() {
@@ -129,6 +135,12 @@ mod test {
             check_multiple_arg(sub_m, "hosts", &["all", "!m8"]);
             // Check for the presence of sync
             assert!(sub_m.is_present("sync"));
+            // Check the group-cmds
+            check_multiple_arg(sub_m, "group_cmds", &["bar"]);
+            // Check the group-pre
+            check_multiple_arg(sub_m, "group_pre", &["m4"]);
+            // Check the group
+            check_multiple_arg(sub_m, "group", &["m1", "m2", "m3", "local", "m6", "m8"]);
         } else {
             // Either no run subcommand or one not tested for...
             assert!(false, "Run subcommand not found!");
@@ -211,6 +223,53 @@ mod test {
     fn run_subcommand_missing_hosts() {
         assert!(app("")
             .get_matches_from_safe(vec!["mussh", "run", "-c", "python", "nginx", "tmux", "-s",])
+            .is_err());
+    }
+
+    #[test]
+    fn run_subcommand_missing_all() {
+        assert!(app("").get_matches_from_safe(vec!["mussh", "run"]).is_err());
+    }
+
+    #[test]
+    fn run_subcommand_missing_group() {
+        assert!(app("")
+            .get_matches_from_safe(vec![
+                "mussh",
+                "run",
+                "--group-cmds",
+                "bar",
+                "--group-pre",
+                "m4"
+            ])
+            .is_err());
+    }
+
+    #[test]
+    fn run_subcommand_missing_group_pre() {
+        assert!(app("")
+            .get_matches_from_safe(vec![
+                "mussh",
+                "run",
+                "--group-cmds",
+                "bar",
+                "--group",
+                "m1,m2,m3"
+            ])
+            .is_err());
+    }
+
+    #[test]
+    fn run_subcommand_missing_group_cmds() {
+        assert!(app("")
+            .get_matches_from_safe(vec![
+                "mussh",
+                "run",
+                "--group-pre",
+                "m4",
+                "--group",
+                "m1,m2,m3"
+            ])
             .is_err());
     }
 }
