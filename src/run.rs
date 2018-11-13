@@ -36,7 +36,10 @@ crate fn run() -> Fallible<()> {
         .join(MUSSH_CONFIG_FILE_NAME);
     try_trace!(stdout, "Config Path: {}", config_path.display());
     let mussh_config = Mussh::try_from(config_path)?;
-    try_trace!(stdout, "{:?}", mussh_config);
+
+    if matches.is_present("output") {
+        try_trace!(stdout, "{:?}", mussh_config);
+    }
 
     // Run, run, run...
     match matches.subcommand() {
@@ -50,9 +53,9 @@ crate fn run() -> Fallible<()> {
         ("run", Some(sub_m)) => Run::try_from(sub_m)?
             .set_stdout(stdout)
             .set_stderr(stderr)
-            .set_config(Some(mussh_config))
+            .set_config(mussh_config)
             .set_dry_run(matches.is_present("dry_run"))
-            .cmd(),
+            .multiplex(),
         (cmd, _) => Err(failure::err_msg(format!("Unknown subcommand {}", cmd))),
     }
 }
@@ -83,6 +86,12 @@ fn app<'a, 'b>(default_config_path: &'a str) -> App<'a, 'b> {
                 .multiple(true)
                 .help("Set the output verbosity level (more v's = more verbose)"),
         )
+        .arg(
+            Arg::with_name("output")
+                .short("o")
+                .long("output")
+                .help("Show the TOML configuration"),
+        )
         .subcommand(Run::subcommand())
 }
 
@@ -111,6 +120,7 @@ mod test {
             "-c",
             "test_cfg",
             "--dry_run",
+            "--output",
             "run",
             "-c",
             "python",

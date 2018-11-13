@@ -8,8 +8,8 @@ crate struct MusshError {
 
 #[derive(Copy, Clone, Eq, PartialEq, Debug, Fail)]
 crate enum MusshErrorKind {
-    #[fail(display = "The TOML configuration is invalid")]
-    InvalidConfigToml,
+    // #[fail(display = "The TOML configuration is invalid")]
+    // InvalidConfigToml,
     #[fail(display = "Failed to establish SSH session")]
     SshSession,
     #[fail(display = "Failed to authenticate for SSH session")]

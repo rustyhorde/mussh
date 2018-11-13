@@ -7,5 +7,5 @@ use failure::Fallible;
 
 crate trait SubCmd {
     fn subcommand<'a, 'b>() -> App<'a, 'b>;
-    fn cmd(&self) -> Fallible<()>;
+    fn multiplex(&self) -> Fallible<()>;
 }

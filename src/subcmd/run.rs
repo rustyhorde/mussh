@@ -3,6 +3,7 @@ use crate::config::{Command, Host, Mussh};
 use crate::error::MusshErrorKind;
 use crate::logging::{FileDrain, Slogger};
 use crate::subcmd::SubCmd;
+use crossbeam::sync::WaitGroup;
 use failure::{Error, Fallible};
 use getset::{Getters, Setters};
 use indexmap::{IndexMap, IndexSet};
@@ -22,18 +23,19 @@ use std::time::{Duration, Instant};
 
 #[derive(Clone, Debug, Default, Getters, Setters)]
 crate struct Run {
-    commands: Vec<String>,
-    #[get = "pub"]
-    hosts: Option<Vec<String>>,
-    groups: Option<Vec<String>>,
+    commands: Option<Vec<String>>,
+    #[get]
+    hosts: Vec<String>,
+    group_cmds: Option<Vec<String>>,
+    group_pre: Option<Vec<String>>,
+    group: Option<Vec<String>>,
     sync: bool,
     stdout: Option<Logger>,
     stderr: Option<Logger>,
+    #[get]
     #[set = "pub"]
-    #[get = "pub"]
-    config: Option<Mussh>,
+    config: Mussh,
     #[set = "pub"]
-    #[get = "pub"]
     dry_run: bool,
 }
 
@@ -79,64 +81,64 @@ impl Run {
         }
     }
 
-    fn target_hosts(&self) -> Fallible<IndexMap<String, Host>> {
-        if let Some(config) = self.config() {
-            if let Some(hosts) = self.hosts() {
-                let requested_hosts: IndexSet<String> = IndexSet::from_iter(hosts.iter().cloned());
-                self.display_set("Command Line Hosts:      ", &requested_hosts, &None);
+    fn pre_hosts(&self) -> Fallible<IndexSet<Host>> {
+        Ok(IndexSet::new())
+    }
 
-                let mut expanded_hosts: IndexSet<String> =
-                    IndexSet::from_iter(hosts.iter().flat_map(|host| hostnames(config, host)));
-                self.display_set("Expanded Hosts:          ", &expanded_hosts, &None);
+    fn target_hosts(&self) -> IndexSet<String> {
+        // Get the hosts that were request on the command line.
+        let requested_hosts: IndexSet<String> = IndexSet::from_iter(self.hosts.iter().cloned());
+        self.display_set("Command Line Hosts:      ", &requested_hosts, &None);
 
-                let remove_unwanted: IndexSet<String> =
-                    IndexSet::from_iter(hosts.iter().filter_map(|host| unwanted_host(host)));
-                self.display_set("Unwanted Hosts:          ", &remove_unwanted, &None);
+        // Expand the hosts (i.e. most -> m1, m2, m3)
+        let mut expanded_hosts: IndexSet<String> = IndexSet::from_iter(
+            self.hosts
+                .iter()
+                .flat_map(|host| hostnames(&self.config, host)),
+        );
+        self.display_set("Expanded Hosts:          ", &expanded_hosts, &None);
 
-                expanded_hosts.retain(|x| !remove_unwanted.contains(x));
+        // Remove any unwanted from the expansion (i.e. most !m1 -> m2, m3)
+        let remove_unwanted =
+            IndexSet::from_iter(self.hosts.iter().filter_map(|host| unwanted_host(host)));
+        self.display_set("Unwanted Hosts:          ", &remove_unwanted, &None);
 
-                let configured_hosts: IndexSet<String> =
-                    IndexSet::from_iter(config.hostlist().keys().cloned());
-                self.display_set("Configured Hosts:        ", &configured_hosts, &None);
+        expanded_hosts.retain(|x| !remove_unwanted.contains(x));
 
-                let not_configured_hosts: IndexSet<String> = expanded_hosts
-                    .difference(&configured_hosts)
-                    .cloned()
-                    .collect();
-                self.display_set("Not Configured Hosts:    ", &not_configured_hosts, &None);
+        // Get the set of hosts that exist in mussh.toml.
+        let configured_hosts: IndexSet<String> =
+            IndexSet::from_iter(self.config().hostlist().keys().cloned());
+        self.display_set("Configured Hosts:        ", &configured_hosts, &None);
 
-                if !not_configured_hosts.is_empty() {
-                    self.display_set("", &not_configured_hosts, &Some(WarnType::Hosts));
-                }
+        // Generate the set of hosts from the command line that are not configured.
+        let not_configured_hosts: IndexSet<String> = expanded_hosts
+            .difference(&configured_hosts)
+            .cloned()
+            .collect();
 
-                let matched_hosts: IndexMap<String, Host> = expanded_hosts
-                    .intersection(&configured_hosts)
-                    .filter_map(|hostname| {
-                        if let Some(host) = config.hosts().get(hostname) {
-                            Some((hostname.clone(), host.clone()))
-                        } else {
-                            None
-                        }
-                    })
-                    .collect();
-
-                Ok(matched_hosts)
-            } else {
-                Err(MusshErrorKind::InvalidConfigToml.into())
-            }
-        } else {
-            Err(MusshErrorKind::InvalidConfigToml.into())
+        if !not_configured_hosts.is_empty() {
+            println!("Why am I not empty?");
+            self.display_set("Not Configured Hosts:    ", &not_configured_hosts, &None);
         }
+
+        if !not_configured_hosts.is_empty() {
+            self.display_set("", &not_configured_hosts, &Some(WarnType::Hosts));
+        }
+
+        // Generate the set of host that were requested and configured.
+        expanded_hosts
+            .intersection(&configured_hosts)
+            .cloned()
+            .collect()
     }
 
     fn target_cmds(&self) -> Fallible<IndexMap<String, Command>> {
-        if let Some(config) = self.config() {
-            let requested_cmds: IndexSet<String> =
-                IndexSet::from_iter(self.commands.iter().cloned());
+        if let Some(commands) = &self.commands {
+            let requested_cmds: IndexSet<String> = IndexSet::from_iter(commands.iter().cloned());
             self.display_set("Command Line Commands:   ", &requested_cmds, &None);
 
             let configured_cmds: IndexSet<String> =
-                IndexSet::from_iter(config.cmd().keys().cloned());
+                IndexSet::from_iter(self.config().cmd().keys().cloned());
             self.display_set("Configured Commands:     ", &configured_cmds, &None);
 
             let not_configured_commands: IndexSet<String> = requested_cmds
@@ -152,17 +154,15 @@ impl Run {
             let matched_cmds: IndexMap<String, Command> = requested_cmds
                 .intersection(&configured_cmds)
                 .filter_map(|cmd_name| {
-                    if let Some(cmd) = config.cmd().get(cmd_name) {
-                        Some((cmd_name.clone(), cmd.clone()))
-                    } else {
-                        try_warn!(self.stdout, "{} is not configured!", cmd_name);
-                        None
-                    }
+                    self.config()
+                        .cmd()
+                        .get(cmd_name)
+                        .and_then(|cmd| Some((cmd_name.clone(), cmd.clone())))
                 })
                 .collect();
             Ok(matched_cmds)
         } else {
-            Err(MusshErrorKind::InvalidConfigToml.into())
+            Ok(IndexMap::new())
         }
     }
 
@@ -171,14 +171,10 @@ impl Run {
         target_host: &Host,
         expected_cmds: &IndexMap<String, Command>,
     ) -> Fallible<IndexMap<String, String>> {
-        if let Some(config) = self.config() {
-            Ok(expected_cmds
-                .iter()
-                .map(|(cmd_name, command)| setup_alias(config, command, cmd_name, target_host))
-                .collect())
-        } else {
-            Err(MusshErrorKind::InvalidConfigToml.into())
-        }
+        Ok(expected_cmds
+            .iter()
+            .map(|(cmd_name, command)| setup_alias(self.config(), command, cmd_name, target_host))
+            .collect())
     }
 
     fn host_file_logger(&self, hostname: &str) -> Fallible<Logger> {
@@ -270,13 +266,26 @@ impl SubCmd for Run {
             ))
     }
 
-    fn cmd(&self) -> Fallible<()> {
-        let target_hosts = self.target_hosts()?;
+    fn multiplex(&self) -> Fallible<()> {
+        try_trace!(self.stdout, "Multiplexing commands across hosts");
+        let target_hosts = self.target_hosts();
+        let _pre_group_hosts = self.pre_hosts()?;
         let count = target_hosts.len();
         let cmds = self.target_cmds()?;
         let (tx, rx) = mpsc::channel();
+        let wg = WaitGroup::new();
 
-        for (hostname, host) in target_hosts {
+        let matched_hosts: IndexMap<String, Host> = target_hosts
+            .iter()
+            .filter_map(|hostname| {
+                self.config()
+                    .hosts()
+                    .get(hostname)
+                    .and_then(|host| Some((hostname.clone(), host.clone())))
+            })
+            .collect();
+
+        for (hostname, host) in matched_hosts {
             let actual_cmds: IndexMap<String, String> = self.actual_cmds(&host, &cmds)?;
 
             try_trace!(
@@ -354,6 +363,7 @@ impl SubCmd for Run {
                 }
             }
         }
+        wg.wait();
         Ok(())
     }
 }
@@ -603,14 +613,15 @@ impl<'a> TryFrom<&'a ArgMatches<'a>> for Run {
         let mut run = Self::default();
         run.commands = matches
             .values_of("commands")
-            .ok_or_else(|| failure::err_msg("No commands found to run!"))?
-            .map(|s| s.to_string())
-            .collect();
+            .and_then(|values| Some(values.map(|v| v.to_string()).collect()));
         run.hosts = matches
             .values_of("hosts")
+            .map_or_else(|| vec![], |values| values.map(|v| v.to_string()).collect());
+        run.group_cmds = matches
+            .values_of("group_cmds")
             .and_then(|values| Some(values.map(|v| v.to_string()).collect()));
-        run.groups = matches
-            .values_of("groups")
+        run.group = matches
+            .values_of("group")
             .and_then(|values| Some(values.map(|v| v.to_string()).collect()));
         run.sync = matches.is_present("sync");
         Ok(run)
