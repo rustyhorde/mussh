@@ -21,14 +21,29 @@ use std::sync::mpsc;
 use std::thread;
 use std::time::{Duration, Instant};
 
+const CMD_LINE_HOSTS: &str = "Command Line Hosts:      ";
+const CMD_LINE_PRE_HOSTS: &str = "Command Line Pre-Hosts:  ";
+const EXPANDED_HOSTS: &str = "Expanded Hosts:          ";
+const EXPANDED_PRE_HOSTS: &str = "Expanded Pre-Hosts:      ";
+const UNWANTED_HOSTS: &str = "Unwanted Hosts:          ";
+const UNWANTED_PRE_HOSTS: &str = "Unwanted Pre-Hosts:      ";
+const CONFIGURED_HOSTS: &str = "Configured Hosts:        ";
+const CONFIGURED_PRE_HOSTS: &str = "Configured Pre-Hosts     ";
+const UNCONFIGURED_HOSTS: &str = "Unconfigured Hosts:      ";
+const UNCONFIGURED_PRE_HOSTS: &str = "Unconfigured Pre-Hosts   ";
+
 #[derive(Clone, Debug, Default, Getters, Setters)]
 crate struct Run {
-    commands: Option<Vec<String>>,
+    #[get]
+    commands: Vec<String>,
     #[get]
     hosts: Vec<String>,
-    group_cmds: Option<Vec<String>>,
-    group_pre: Option<Vec<String>>,
-    group: Option<Vec<String>>,
+    #[get]
+    group_cmds: Vec<String>,
+    #[get]
+    group_pre: Vec<String>,
+    #[get]
+    group: Vec<String>,
     sync: bool,
     stdout: Option<Logger>,
     stderr: Option<Logger>,
@@ -40,11 +55,10 @@ crate struct Run {
 }
 
 fn hostnames(config: &Mussh, host: &str) -> Vec<String> {
-    if let Some(hosts) = config.hostlist().get(host) {
-        hosts.hostnames().clone()
-    } else {
-        vec![]
-    }
+    config
+        .hostlist()
+        .get(host)
+        .map_or_else(|| vec![], |hosts| hosts.hostnames().clone())
 }
 
 fn unwanted_host(host: &str) -> Option<String> {
@@ -58,6 +72,11 @@ fn unwanted_host(host: &str) -> Option<String> {
 enum WarnType {
     Hosts,
     Cmds,
+}
+
+enum HostType {
+    HOST,
+    PRE,
 }
 
 impl Run {
@@ -81,89 +100,129 @@ impl Run {
         }
     }
 
-    fn pre_hosts(&self) -> Fallible<IndexSet<Host>> {
-        Ok(IndexSet::new())
+    fn as_set<T>(&self, iter: T, prefix: &str, warn_type: &Option<WarnType>) -> IndexSet<String>
+    where
+        T: IntoIterator<Item = String>,
+    {
+        let set = IndexSet::from_iter(iter);
+        if !set.is_empty() {
+            self.display_set(prefix, &set, warn_type);
+        }
+        set
+    }
+
+    fn requested(&self, host_type: &HostType) -> IndexSet<String> {
+        let (hosts, prefix) = match host_type {
+            HostType::HOST => (self.hosts(), CMD_LINE_HOSTS),
+            HostType::PRE => (self.group_pre(), CMD_LINE_PRE_HOSTS),
+        };
+        self.as_set(hosts.iter().cloned(), prefix, &None)
+    }
+
+    fn expanded(&self, host_type: &HostType) -> IndexSet<String> {
+        let (hosts, prefix) = match host_type {
+            HostType::HOST => (self.hosts(), EXPANDED_HOSTS),
+            HostType::PRE => (self.group_pre(), EXPANDED_PRE_HOSTS),
+        };
+        let hostnames = hosts.iter().flat_map(|host| hostnames(&self.config, host));
+        self.as_set(hostnames, prefix, &None)
+    }
+
+    fn unwanted(&self, host_type: &HostType) -> IndexSet<String> {
+        let (hosts, prefix) = match host_type {
+            HostType::HOST => (self.hosts(), UNWANTED_HOSTS),
+            HostType::PRE => (self.group_pre(), UNWANTED_PRE_HOSTS),
+        };
+        let unwanted = hosts.iter().filter_map(|host| unwanted_host(host));
+        self.as_set(unwanted, prefix, &None)
+    }
+
+    fn configured(&self, host_type: &HostType) -> IndexSet<String> {
+        let (hosts, prefix) = match host_type {
+            HostType::HOST => (self.config().hostlist(), CONFIGURED_HOSTS),
+            HostType::PRE => (self.config().hostlist(), CONFIGURED_PRE_HOSTS),
+        };
+        let configured = hosts.keys().cloned();
+        self.as_set(configured, prefix, &None)
+    }
+
+    fn unconfigured(
+        &self,
+        host_type: &HostType,
+        expanded: &IndexSet<String>,
+        configured: &IndexSet<String>,
+    ) -> IndexSet<String> {
+        let prefix = match host_type {
+            HostType::HOST => UNCONFIGURED_HOSTS,
+            HostType::PRE => UNCONFIGURED_PRE_HOSTS,
+        };
+        let unconfigured = expanded.difference(configured).cloned();
+        self.as_set(unconfigured, prefix, &Some(WarnType::Hosts))
+    }
+
+    fn pre_hosts(&self) -> IndexSet<String> {
+        let host_type = HostType::PRE;
+        // Genereate the set of hosts that were requested
+        let _ = self.requested(&host_type);
+        // Generate the set of expanded hosts
+        let mut expanded = self.expanded(&host_type);
+        // Generate the set of unwanted hosts
+        let unwanted = self.unwanted(&host_type);
+        // Retain the wanted hosts from the expanded set
+        expanded.retain(|x| !unwanted.contains(x));
+        // Generate the set of hosts that are configured in mussh.toml.
+        let configured = self.configured(&host_type);
+        // Generate the set of hosts that were requested and not configured.
+        let _ = self.unconfigured(&host_type, &expanded, &configured);
+        // Generate the set of hosts that were requested and configured.
+        expanded.intersection(&configured).cloned().collect()
     }
 
     fn target_hosts(&self) -> IndexSet<String> {
-        // Get the hosts that were request on the command line.
-        let requested_hosts: IndexSet<String> = IndexSet::from_iter(self.hosts.iter().cloned());
-        self.display_set("Command Line Hosts:      ", &requested_hosts, &None);
-
-        // Expand the hosts (i.e. most -> m1, m2, m3)
-        let mut expanded_hosts: IndexSet<String> = IndexSet::from_iter(
-            self.hosts
-                .iter()
-                .flat_map(|host| hostnames(&self.config, host)),
-        );
-        self.display_set("Expanded Hosts:          ", &expanded_hosts, &None);
-
-        // Remove any unwanted from the expansion (i.e. most !m1 -> m2, m3)
-        let remove_unwanted =
-            IndexSet::from_iter(self.hosts.iter().filter_map(|host| unwanted_host(host)));
-        self.display_set("Unwanted Hosts:          ", &remove_unwanted, &None);
-
-        expanded_hosts.retain(|x| !remove_unwanted.contains(x));
-
-        // Get the set of hosts that exist in mussh.toml.
-        let configured_hosts: IndexSet<String> =
-            IndexSet::from_iter(self.config().hostlist().keys().cloned());
-        self.display_set("Configured Hosts:        ", &configured_hosts, &None);
-
-        // Generate the set of hosts from the command line that are not configured.
-        let not_configured_hosts: IndexSet<String> = expanded_hosts
-            .difference(&configured_hosts)
-            .cloned()
-            .collect();
-
-        if !not_configured_hosts.is_empty() {
-            println!("Why am I not empty?");
-            self.display_set("Not Configured Hosts:    ", &not_configured_hosts, &None);
-        }
-
-        if !not_configured_hosts.is_empty() {
-            self.display_set("", &not_configured_hosts, &Some(WarnType::Hosts));
-        }
-
-        // Generate the set of host that were requested and configured.
-        expanded_hosts
-            .intersection(&configured_hosts)
-            .cloned()
-            .collect()
+        let host_type = HostType::HOST;
+        // Genereate the set of hosts that were requested
+        let _ = self.requested(&host_type);
+        // Generate the set of expanded hosts
+        let mut expanded = self.expanded(&host_type);
+        // Generate the set of unwanted hosts
+        let unwanted = self.unwanted(&host_type);
+        // Retain the wanted hosts from the expanded set
+        expanded.retain(|x| !unwanted.contains(x));
+        // Generate the set of hosts that are configured in mussh.toml.
+        let configured = self.configured(&host_type);
+        // Generate the set of hosts that were requested and not configured.
+        let _ = self.unconfigured(&host_type, &expanded, &configured);
+        // Generate the set of hosts that were requested and configured.
+        expanded.intersection(&configured).cloned().collect()
     }
 
-    fn target_cmds(&self) -> Fallible<IndexMap<String, Command>> {
-        if let Some(commands) = &self.commands {
-            let requested_cmds: IndexSet<String> = IndexSet::from_iter(commands.iter().cloned());
-            self.display_set("Command Line Commands:   ", &requested_cmds, &None);
+    fn target_cmds(&self) -> IndexMap<String, Command> {
+        let requested_cmds: IndexSet<String> = IndexSet::from_iter(self.commands().iter().cloned());
+        self.display_set("Command Line Commands:   ", &requested_cmds, &None);
 
-            let configured_cmds: IndexSet<String> =
-                IndexSet::from_iter(self.config().cmd().keys().cloned());
-            self.display_set("Configured Commands:     ", &configured_cmds, &None);
+        let configured_cmds: IndexSet<String> =
+            IndexSet::from_iter(self.config().cmd().keys().cloned());
+        self.display_set("Configured Commands:     ", &configured_cmds, &None);
 
-            let not_configured_commands: IndexSet<String> = requested_cmds
-                .difference(&configured_cmds)
-                .cloned()
-                .collect();
-            self.display_set("Not Configured Commands: ", &not_configured_commands, &None);
+        let not_configured_commands: IndexSet<String> = requested_cmds
+            .difference(&configured_cmds)
+            .cloned()
+            .collect();
+        self.display_set("Not Configured Commands: ", &not_configured_commands, &None);
 
-            if !not_configured_commands.is_empty() {
-                self.display_set("", &not_configured_commands, &Some(WarnType::Cmds));
-            }
-
-            let matched_cmds: IndexMap<String, Command> = requested_cmds
-                .intersection(&configured_cmds)
-                .filter_map(|cmd_name| {
-                    self.config()
-                        .cmd()
-                        .get(cmd_name)
-                        .and_then(|cmd| Some((cmd_name.clone(), cmd.clone())))
-                })
-                .collect();
-            Ok(matched_cmds)
-        } else {
-            Ok(IndexMap::new())
+        if !not_configured_commands.is_empty() {
+            self.display_set("", &not_configured_commands, &Some(WarnType::Cmds));
         }
+
+        requested_cmds
+            .intersection(&configured_cmds)
+            .filter_map(|cmd_name| {
+                self.config()
+                    .cmd()
+                    .get(cmd_name)
+                    .and_then(|cmd| Some((cmd_name.clone(), cmd.clone())))
+            })
+            .collect()
     }
 
     fn actual_cmds(
@@ -269,14 +328,14 @@ impl SubCmd for Run {
     fn multiplex(&self) -> Fallible<()> {
         try_trace!(self.stdout, "Multiplexing commands across hosts");
         let target_hosts = self.target_hosts();
-        let _pre_group_hosts = self.pre_hosts()?;
+        let pre_hosts = self.pre_hosts();
         let count = target_hosts.len();
-        let cmds = self.target_cmds()?;
+        let cmds = self.target_cmds();
         let (tx, rx) = mpsc::channel();
         let wg = WaitGroup::new();
 
         let matched_hosts: IndexMap<String, Host> = target_hosts
-            .iter()
+            .union(&pre_hosts)
             .filter_map(|hostname| {
                 self.config()
                     .hosts()
@@ -613,16 +672,19 @@ impl<'a> TryFrom<&'a ArgMatches<'a>> for Run {
         let mut run = Self::default();
         run.commands = matches
             .values_of("commands")
-            .and_then(|values| Some(values.map(|v| v.to_string()).collect()));
+            .map_or_else(|| vec![], |values| values.map(|v| v.to_string()).collect());
         run.hosts = matches
             .values_of("hosts")
             .map_or_else(|| vec![], |values| values.map(|v| v.to_string()).collect());
+        run.group_pre = matches
+            .values_of("group_pre")
+            .map_or_else(|| vec![], |values| values.map(|v| v.to_string()).collect());
         run.group_cmds = matches
             .values_of("group_cmds")
-            .and_then(|values| Some(values.map(|v| v.to_string()).collect()));
+            .map_or_else(|| vec![], |values| values.map(|v| v.to_string()).collect());
         run.group = matches
             .values_of("group")
-            .and_then(|values| Some(values.map(|v| v.to_string()).collect()));
+            .map_or_else(|| vec![], |values| values.map(|v| v.to_string()).collect());
         run.sync = matches.is_present("sync");
         Ok(run)
     }
