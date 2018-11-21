@@ -1,7 +1,7 @@
-use clap::{App, Arg};
 use crate::config::{Mussh, MUSSH_CONFIG_FILE_NAME};
 use crate::logging::{Loggers, Slogger};
 use crate::subcmd::{Run, SubCmd};
+use clap::{App, Arg};
 use failure::Fallible;
 use slog::trace;
 use slog_try::try_trace;

@@ -1,8 +1,8 @@
-use clap::{App, Arg, ArgMatches, SubCommand};
 use crate::config::{Command, Host, Mussh};
 use crate::error::MusshErrorKind;
 use crate::logging::{FileDrain, Slogger};
 use crate::subcmd::SubCmd;
+use clap::{App, Arg, ArgMatches, SubCommand};
 use crossbeam::sync::WaitGroup;
 use failure::{Error, Fallible};
 use getset::{Getters, Setters};
@@ -523,20 +523,20 @@ fn execute_on_localhost(
 
             if status.success() {
                 try_info!(
-                stdout,
-                "execute";
-                "host" => host.hostname(),
-                "cmd" => cmd_name,
-                "duration" => elapsed_str
-            );
+                    stdout,
+                    "execute";
+                    "host" => host.hostname(),
+                    "cmd" => cmd_name,
+                    "duration" => elapsed_str
+                );
             } else {
                 try_error!(
-                stderr,
-                "execute";
-                "host" => host.hostname(),
-                "cmd" => cmd_name,
-                "duration" => elapsed_str
-            );
+                    stderr,
+                    "execute";
+                    "host" => host.hostname(),
+                    "cmd" => cmd_name,
+                    "duration" => elapsed_str
+                );
             }
         }
         Ok(())
