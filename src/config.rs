@@ -151,9 +151,9 @@ fn stderr_logger() -> Logger {
     Logger::root(
         stderr_level_drain,
         o!(
-        "executable" => env!("CARGO_PKG_NAME"),
-        "version" => env!("CARGO_PKG_VERSION")
-    ),
+            "executable" => env!("CARGO_PKG_NAME"),
+            "version" => env!("CARGO_PKG_VERSION")
+        ),
     )
 }
 
@@ -168,9 +168,9 @@ fn stdout_logger(level: Level) -> Logger {
     Logger::root(
         stdout_level_drain,
         o!(
-        "executable" => env!("CARGO_PKG_NAME"),
-        "version" => env!("CARGO_PKG_VERSION")
-    ),
+            "executable" => env!("CARGO_PKG_NAME"),
+            "version" => env!("CARGO_PKG_VERSION")
+        ),
     )
 }
 

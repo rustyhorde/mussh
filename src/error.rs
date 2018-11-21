@@ -7,7 +7,7 @@
 // modified, or distributed except according to those terms.
 
 //! `mussh` errors
-error_chain!{
+error_chain! {
     foreign_links {
         Ssh2(::ssh2::Error);
         Io(::std::io::Error);
