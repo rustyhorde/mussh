@@ -1,73 +1,98 @@
-// Copyright (c) 2016 mussh developers
-//
-// Licensed under the Apache License, Version 2.0
-// <LICENSE-APACHE or http://www.apache.org/licenses/LICENSE-2.0> or the MIT
-// license <LICENSE-MIT or http://opensource.org/licenses/MIT>, at your
-// option. All files in the project carrying such notice may not be copied,
-// modified, or distributed except according to those terms.
+use std::error::Error;
+use std::fmt;
 
-//! `mussh` errors
-error_chain! {
-    foreign_links {
-        Ssh2(::ssh2::Error);
-        Io(::std::io::Error);
-        Term(::term::Error);
-        TomlSe(::toml::ser::Error);
-        ParseInt(::std::num::ParseIntError);
+/// A result that includes a `mussh::Error`
+crate type MusshResult<T> = Result<T, MusshErr>;
+
+/// An error thrown by the mussh library
+#[derive(Debug)]
+crate struct MusshErr {
+    /// The kind of error
+    inner: MusshErrKind,
+}
+
+impl Error for MusshErr {
+    fn description(&self) -> &str {
+        "Mussh Error"
     }
 
-    errors {
-        Config {
-            description("Could not find valid mussh.toml file!")
-            display("Could not find valid mussh.toml file!")
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        Some(&self.inner)
+    }
+}
+
+impl fmt::Display for MusshErr {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.description())?;
+
+        if let Some(source) = self.source() {
+            write!(f, ": {}", source)?;
         }
-        InvalidCmd {
-            description("'cmd' not configured properly in TOML!")
-            display("'cmd' not configured properly in TOML!")
+        write!(f, "")
+    }
+}
+
+macro_rules! external_error {
+    ($error:ty, $kind:expr) => {
+        impl From<$error> for MusshErr {
+            fn from(inner: $error) -> Self {
+                Self {
+                    inner: $kind(inner),
+                }
+            }
         }
-        // InvalidHostList {
-        //     description("'hostlist' not configured properly in TOML!")
-        //     display("'hostlist' not configured properly in TOML!")
-        // }
-        HostDoesNotExist {
-            description("The specified host does not exist in TOML!")
-            display("The specified host does not exist in TOML!")
+    };
+}
+
+impl From<MusshErrKind> for MusshErr {
+    fn from(inner: MusshErrKind) -> Self {
+        Self { inner }
+    }
+}
+
+impl From<&str> for MusshErr {
+    fn from(inner: &str) -> Self {
+        Self {
+            inner: MusshErrKind::Str(inner.to_string()),
         }
-        HostListDoesNotExist {
-            description("The specified hostlist does not exist in TOML!")
-            display("The specified hostlist does not exist in TOML!")
+    }
+}
+
+external_error!(clap::Error, MusshErrKind::Clap);
+external_error!(std::io::Error, MusshErrKind::Io);
+external_error!(libmussh::Error, MusshErrKind::Libmussh);
+external_error!(String, MusshErrKind::Str);
+
+#[derive(Debug)]
+crate enum MusshErrKind {
+    Clap(clap::Error),
+    Io(std::io::Error),
+    Libmussh(libmussh::Error),
+    Str(String),
+}
+
+impl Error for MusshErrKind {
+    fn description(&self) -> &str {
+        match self {
+            MusshErrKind::Clap(inner) => inner.description(),
+            MusshErrKind::Io(inner) => inner.description(),
+            MusshErrKind::Libmussh(inner) => inner.description(),
+            MusshErrKind::Str(inner) => &inner[..],
         }
-        InvalidToml {
-            description("Invalid TOML configuration!")
-            display("Invalid TOML configuration!")
+    }
+
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        match self {
+            MusshErrKind::Clap(inner) => inner.source(),
+            MusshErrKind::Io(inner) => inner.source(),
+            MusshErrKind::Libmussh(inner) => inner.source(),
+            _ => None,
         }
-        NoValidHosts {
-            description("Could not determine any valid hosts!")
-            display("Could not determine any valid hosts!")
-        }
-        NoValidHostlist {
-            description("Could not determine any valid hostlist!")
-            display("Could not determine any valid hostlist!")
-        }
-        HostNotConfigured(host: String) {
-            description("host not configured!")
-            display("host {} not configured!", host)
-        }
-        SshAuthentication {
-            description("ssh authentication failed!")
-            display("ssh authentication failed!")
-        }
-        SshSession {
-            description("invalid ssh session!")
-            display("invalid ssh session!")
-        }
-        SubCommand {
-            description("invalid sub-command!")
-            display("invalid sub-command!")
-        }
-        NoTerm {
-            description("unable to get vallid term!")
-            display("unable to get vallid term!")
-        }
+    }
+}
+
+impl fmt::Display for MusshErrKind {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.description())
     }
 }
