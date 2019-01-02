@@ -120,7 +120,8 @@ fn subcommand<'a, 'b>() -> App<'a, 'b> {
                 .long("hosts")
                 .value_name("HOSTS")
                 .help("The hosts to multiplex the command over")
-                .multiple(true),
+                .multiple(true)
+                .use_delimiter(true),
         )
         .arg(
             Arg::with_name("commands")
@@ -129,7 +130,8 @@ fn subcommand<'a, 'b>() -> App<'a, 'b> {
                 .value_name("CMD")
                 .help("The commands to multiplex")
                 .multiple(true)
-                .requires("hosts"),
+                .requires("hosts")
+                .use_delimiter(true),
         )
         .arg(
             Arg::with_name("sync_hosts")
@@ -217,9 +219,9 @@ mod test {
 
         if let ("run", Some(sub_m)) = app_m.subcommand() {
             // Check the commands
-            check_multiple_arg(sub_m, "commands", &["python,nginx,tmux"]);
+            check_multiple_arg(sub_m, "commands", &["python", "nginx", "tmux"]);
             // Check the hosts
-            check_multiple_arg(sub_m, "hosts", &["all,!m8"]);
+            check_multiple_arg(sub_m, "hosts", &["all", "!m8"]);
             // Check for the presence of sync
             assert!(sub_m.is_present("sync"));
             // Check the group-cmds
@@ -248,9 +250,9 @@ mod test {
 
         if let ("run", Some(sub_m)) = app_m.subcommand() {
             // Check the commands
-            check_multiple_arg(sub_m, "commands", &["python,nginx,tmux"]);
+            check_multiple_arg(sub_m, "commands", &["python", "nginx", "tmux"]);
             // Check the hosts
-            check_multiple_arg(sub_m, "hosts", &["all,!m8"]);
+            check_multiple_arg(sub_m, "hosts", &["all", "!m8"]);
             // Check for the presence of sync
             assert!(sub_m.is_present("sync"));
         } else {
@@ -275,9 +277,9 @@ mod test {
 
         if let ("run", Some(sub_m)) = app_m.subcommand() {
             // Check the commands
-            check_multiple_arg(sub_m, "commands", &["python,nginx,tmux"]);
+            check_multiple_arg(sub_m, "commands", &["python", "nginx", "tmux"]);
             // Check the hosts
-            check_multiple_arg(sub_m, "hosts", &["all,!m8"]);
+            check_multiple_arg(sub_m, "hosts", &["all", "!m8"]);
             // Check for the presence of sync
             assert!(sub_m.is_present("sync"));
         } else {
@@ -291,7 +293,12 @@ mod test {
     #[test]
     fn run_subcmd_no_sync() -> MusshResult<()> {
         let app_m = app("").get_matches_from_safe(vec![
-            "mussh", "run", "-c", "python", "nginx", "tmux", "-h", "all", "!m8",
+            "mussh",
+            "run",
+            "-c",
+            "python,nginx,tmux",
+            "-h",
+            "all,!m8",
         ])?;
 
         if let ("run", Some(sub_m)) = app_m.subcommand() {
