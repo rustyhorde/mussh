@@ -235,25 +235,6 @@ impl Run {
             .map(|(cmd_name, command)| setup_alias(self.config(), command, cmd_name, target_host))
             .collect())
     }
-
-    fn host_file_logger(&self, hostname: &str) -> Fallible<Logger> {
-        let mut host_file_path = if let Some(mut config_dir) = dirs::config_dir() {
-            config_dir.push(env!("CARGO_PKG_NAME"));
-            config_dir
-        } else {
-            PathBuf::new()
-        };
-
-        host_file_path.push(hostname);
-        let _ = host_file_path.set_extension("log");
-
-        try_trace!(self.stdout, "Log Path: {}", host_file_path.display());
-
-        let file_drain = FileDrain::try_from(host_file_path)?;
-        let async_file_drain = slog_async::Async::new(file_drain).build().fuse();
-        let file_logger = Logger::root(async_file_drain, o!());
-        Ok(file_logger)
-    }
 }
 
 impl Slogger for Run {
@@ -269,62 +250,6 @@ impl Slogger for Run {
 }
 
 impl SubCmd for Run {
-    fn subcommand<'a, 'b>() -> App<'a, 'b> {
-        SubCommand::with_name("run")
-            .about("Run a command on hosts")
-            .arg(Arg::with_name("dry_run").long("dryrun").help(
-                "Parse config and setup the client, \
-                 but don't run it.",
-            ))
-            .arg(
-                Arg::with_name("commands")
-                    .short("c")
-                    .long("commands")
-                    .value_name("CMD")
-                    .help("The commands to multiplex")
-                    .multiple(true)
-                    .required_unless("group_cmds"),
-            )
-            .arg(
-                Arg::with_name("hosts")
-                    .short("h")
-                    .long("hosts")
-                    .value_name("HOSTS")
-                    .help("The hosts to multiplex the command over")
-                    .multiple(true)
-                    .required_unless("group"),
-            )
-            .arg(
-                Arg::with_name("group_cmds")
-                    .long("group-cmds")
-                    .value_name("GROUP_CMDS")
-                    .help("The commands to multiplex after completing on the pre-group")
-                    .use_delimiter(true)
-                    .required_unless("hosts")
-                    .requires_all(&["group_pre", "group"])
-            )
-            .arg(
-                Arg::with_name("group_pre")
-                    .long("group-pre")
-                    .value_name("GROUP_PRE")
-                    .help("The group of hosts that should complete before moving on to the hosts specified by the 'group' flag")
-                    .use_delimiter(true)
-                    .requires("group_cmds")
-            )
-            .arg(
-                Arg::with_name("group")
-                    .long("group")
-                    .value_name("GROUP")
-                    .help("The group of hosts that should run after the hosts specified by the 'group-pre' flag")
-                    .use_delimiter(true)
-                    .requires("group_cmds")
-            )
-            .arg(Arg::with_name("sync").short("s").long("sync").help(
-                "Run the given commadn synchronously across the \
-                 hosts.",
-            ))
-    }
-
     fn multiplex(&self) -> Fallible<()> {
         try_trace!(self.stdout, "Multiplexing commands across hosts");
         let target_hosts = self.target_hosts();

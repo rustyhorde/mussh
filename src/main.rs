@@ -7,7 +7,7 @@
 // modified, or distributed except according to those terms.
 
 //! mussh - SSH Multiplexing
-#![feature(crate_visibility_modifier, duration_as_u128, try_from)]
+#![feature(crate_visibility_modifier, try_from)]
 #![deny(
     clippy::all,
     clippy::pedantic,
@@ -39,16 +39,15 @@
     unused_results,
     variant_size_differences
 )]
-#![allow(clippy::stutter)]
+#![allow(clippy::module_name_repetitions)]
 #![doc(html_root_url = "https://docs.rs/mussh/3.0.0")]
 
-mod config;
 mod error;
 mod logging;
 mod run;
-mod subcmd;
 
 use clap::ErrorKind;
+use std::error::Error;
 use std::process;
 
 /// mussh entry point
@@ -56,18 +55,28 @@ fn main() {
     match run::run() {
         Ok(_) => process::exit(0),
         Err(error) => {
-            let cause = error.as_fail();
+            if let Some(cause) = error.source() {
+                if let Some(err) = cause.downcast_ref::<clap::Error>() {
+                    let kind = err.kind;
+                    eprintln!("{}", err.message);
+                    match kind {
+                        ErrorKind::HelpDisplayed | ErrorKind::VersionDisplayed => process::exit(0),
+                        _ => process::exit(1),
+                    }
+                } else {
+                    eprintln!("{}", error.description());
 
-            if let Some(err) = cause.downcast_ref::<clap::Error>() {
-                let kind = err.kind;
-                eprintln!("{}", err.message);
-                match kind {
-                    ErrorKind::HelpDisplayed | ErrorKind::VersionDisplayed => process::exit(0),
-                    _ => process::exit(1),
+                    if let Some(cause) = error.source() {
+                        eprintln!(": {}", cause);
+                    }
+                    process::exit(1);
                 }
             } else {
-                eprintln!("{}", error.as_fail());
-                eprintln!("{}", error.backtrace());
+                eprintln!("{}", error.description());
+
+                if let Some(cause) = error.source() {
+                    eprintln!(": {}", cause);
+                }
                 process::exit(1);
             }
         }

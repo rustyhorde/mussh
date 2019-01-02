@@ -7,8 +7,6 @@ use std::fs::File;
 use std::io::{BufReader, Read};
 use std::path::PathBuf;
 
-crate const MUSSH_CONFIG_FILE_NAME: &str = "mussh.toml";
-
 #[derive(Clone, Debug, Default, Deserialize, Eq, Getters, PartialEq, Serialize)]
 /// The base configuration.
 crate struct Mussh {

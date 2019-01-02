@@ -1,7 +1,7 @@
 //! Logging for the server.
+use crate::error::{MusshErr, MusshResult};
 use chrono::{DateTime, Utc};
 use clap::ArgMatches;
-use failure::{Error, Fallible};
 use getset::Getters;
 use slog::{o, Drain, Level, Logger, Never, OwnedKVList, Record};
 use slog_async::Async;
@@ -38,9 +38,9 @@ impl Loggers {
 }
 
 impl<'a> TryFrom<&'a ArgMatches<'a>> for Loggers {
-    type Error = Error;
+    type Error = MusshErr;
 
-    fn try_from(matches: &'a ArgMatches<'a>) -> Result<Self, Error> {
+    fn try_from(matches: &'a ArgMatches<'a>) -> Result<Self, MusshErr> {
         let level = match matches.occurrences_of("verbose") {
             0 => Level::Warning,
             1 => Level::Info,
@@ -70,14 +70,15 @@ impl<'a> TryFrom<&'a ArgMatches<'a>> for Loggers {
 
 /// A `slog` drain that writes to a file.
 #[derive(Debug)]
+#[allow(dead_code)]
 crate struct FileDrain {
     /// The file to drain log records to.
     file: File,
 }
 
 impl TryFrom<PathBuf> for FileDrain {
-    type Error = Error;
-    fn try_from(path: PathBuf) -> Fallible<Self> {
+    type Error = MusshErr;
+    fn try_from(path: PathBuf) -> MusshResult<Self> {
         Ok(Self {
             file: OpenOptions::new().create(true).append(true).open(path)?,
         })

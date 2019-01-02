@@ -1,28 +1,28 @@
-use crate::config::{Mussh, MUSSH_CONFIG_FILE_NAME};
-use crate::logging::{Loggers, Slogger};
-use crate::subcmd::{Run, SubCmd};
-use clap::{App, Arg};
-use failure::Fallible;
-use slog::trace;
+use crate::error::MusshResult;
+use crate::logging::{FileDrain, Loggers};
+use clap::{App, Arg, SubCommand};
+use libmussh::{Config, Multiplex, RuntimeConfig};
+use slog::{o, trace, Drain, Logger};
 use slog_try::try_trace;
+use std::collections::HashMap;
 use std::convert::TryFrom;
 use std::env;
 use std::path::PathBuf;
 
-fn base_config_dir() -> Fallible<PathBuf> {
+crate const MUSSH_CONFIG_FILE_NAME: &str = "mussh.toml";
+
+fn base_config_dir() -> MusshResult<PathBuf> {
     Ok(if let Some(config_dir) = dirs::config_dir() {
         config_dir
     } else if let Ok(current_dir) = env::current_dir() {
         current_dir
     } else {
-        return Err(failure::err_msg(
-            "Unable to determine a suitable config directory!",
-        ));
+        return Err("Unable to determine a suitable config directory!".into());
     }
     .join(env!("CARGO_PKG_NAME")))
 }
 
-crate fn run() -> Fallible<()> {
+crate fn run() -> MusshResult<()> {
     // Setup the default config path for use in clap App
     let base_path = base_config_dir()?;
     let base_path_str = format!("{}", base_path.display());
@@ -35,10 +35,10 @@ crate fn run() -> Fallible<()> {
     let config_path = PathBuf::from(matches.value_of("config").unwrap_or_else(|| "./"))
         .join(MUSSH_CONFIG_FILE_NAME);
     try_trace!(stdout, "Config Path: {}", config_path.display());
-    let mussh_config = Mussh::try_from(config_path)?;
+    let config = Config::try_from(config_path)?;
 
     if matches.is_present("output") {
-        try_trace!(stdout, "{:?}", mussh_config);
+        try_trace!(stdout, "{:?}", config);
     }
 
     // Run, run, run...
@@ -50,13 +50,25 @@ crate fn run() -> Fallible<()> {
         // 'hosts' subcommand
         // ("hosts", Some(sub_m)) => hosts::cmd(&mut config, sub_m),
         // 'run' subcommand
-        ("run", Some(sub_m)) => Run::try_from(sub_m)?
-            .set_stdout(stdout)
-            .set_stderr(stderr)
-            .set_config(mussh_config)
-            .set_dry_run(matches.is_present("dry_run"))
-            .multiplex(),
-        (cmd, _) => Err(failure::err_msg(format!("Unknown subcommand {}", cmd))),
+        ("run", Some(sub_m)) => {
+            let runtime_config = RuntimeConfig::from(sub_m);
+            let sync_hosts = runtime_config.sync_hosts();
+            let multiplex_map = config.to_host_map(&runtime_config);
+            let mut cmd_loggers_map = HashMap::new();
+            for host in multiplex_map.keys() {
+                let _ = cmd_loggers_map
+                    .entry(host.clone())
+                    .or_insert_with(|| host_file_logger(&stdout, host));
+            }
+            let mut multiplex = Multiplex::default();
+            let _ = multiplex.set_stdout(stdout);
+            let _ = multiplex.set_stderr(stderr);
+            let _ = multiplex.set_host_loggers(cmd_loggers_map);
+            multiplex
+                .multiplex(sync_hosts, multiplex_map)
+                .map_err(|e| e.into())
+        }
+        (cmd, _) => Err(format!("Unknown subcommand {}", cmd).into()),
     }
 }
 
@@ -92,14 +104,84 @@ fn app<'a, 'b>(default_config_path: &'a str) -> App<'a, 'b> {
                 .long("output")
                 .help("Show the TOML configuration"),
         )
-        .subcommand(Run::subcommand())
+        .subcommand(subcommand())
+}
+
+fn subcommand<'a, 'b>() -> App<'a, 'b> {
+    SubCommand::with_name("run")
+        .about("Run a command on hosts")
+        .arg(Arg::with_name("dry_run").long("dryrun").help(
+            "Parse config and setup the client, \
+             but don't run it.",
+        ))
+        .arg(
+            Arg::with_name("hosts")
+                .short("h")
+                .long("hosts")
+                .value_name("HOSTS")
+                .help("The hosts to multiplex the command over")
+                .multiple(true),
+        )
+        .arg(
+            Arg::with_name("commands")
+                .short("c")
+                .long("commands")
+                .value_name("CMD")
+                .help("The commands to multiplex")
+                .multiple(true)
+                .requires("hosts"),
+        )
+        .arg(
+            Arg::with_name("sync_hosts")
+                .short("s")
+                .long("sync_hosts")
+                .value_name("HOSTS")
+                .help("The hosts to run the sync commands on before running on any other hosts")
+                .use_delimiter(true)
+                .required_unless("hosts")
+                .requires("sync_commands"),
+        )
+        .arg(
+            Arg::with_name("sync_commands")
+                .short("y")
+                .long("sync_commands")
+                .value_name("CMD")
+                .help("The commands to run on the sync hosts before running on any other hosts")
+                .use_delimiter(true),
+        )
+        .arg(Arg::with_name("sync").long("sync").help(
+            "Run the given commadn synchronously across the \
+             hosts.",
+        ))
+}
+
+fn host_file_logger(stdout: &Option<Logger>, hostname: &str) -> Option<Logger> {
+    let mut host_file_path = if let Some(mut config_dir) = dirs::config_dir() {
+        config_dir.push(env!("CARGO_PKG_NAME"));
+        config_dir
+    } else {
+        PathBuf::new()
+    };
+
+    host_file_path.push(hostname);
+    let _ = host_file_path.set_extension("log");
+
+    try_trace!(stdout, "Log Path: {}", host_file_path.display());
+
+    if let Ok(file_drain) = FileDrain::try_from(host_file_path) {
+        let async_file_drain = slog_async::Async::new(file_drain).build().fuse();
+        let file_logger = Logger::root(async_file_drain, o!());
+        Some(file_logger)
+    } else {
+        None
+    }
 }
 
 #[cfg(test)]
 mod test {
     use super::app;
+    use crate::error::MusshResult;
     use clap::ArgMatches;
-    use failure::Fallible;
 
     fn check_multiple_arg(m: &ArgMatches<'_>, name: &str, expected: &[&str]) {
         assert!(m.is_present(name));
@@ -113,7 +195,7 @@ mod test {
     }
 
     #[test]
-    fn full_run_subcmd() -> Fallible<()> {
+    fn full_run_subcmd() -> MusshResult<()> {
         let app_m = app("").get_matches_from_safe(vec![
             "mussh",
             "-vvv",
@@ -123,34 +205,27 @@ mod test {
             "--output",
             "run",
             "-c",
-            "python",
-            "nginx",
-            "tmux",
+            "python,nginx,tmux",
             "-h",
-            "all",
-            "!m8",
+            "all,!m8",
+            "--sync",
             "-s",
-            "--group-cmds",
-            "bar",
-            "--group-pre",
             "m4",
-            "--group",
-            "m1,m2,m3,local,m6,m8",
+            "-y",
+            "bar",
         ])?;
 
         if let ("run", Some(sub_m)) = app_m.subcommand() {
             // Check the commands
-            check_multiple_arg(sub_m, "commands", &["python", "nginx", "tmux"]);
+            check_multiple_arg(sub_m, "commands", &["python,nginx,tmux"]);
             // Check the hosts
-            check_multiple_arg(sub_m, "hosts", &["all", "!m8"]);
+            check_multiple_arg(sub_m, "hosts", &["all,!m8"]);
             // Check for the presence of sync
             assert!(sub_m.is_present("sync"));
             // Check the group-cmds
-            check_multiple_arg(sub_m, "group_cmds", &["bar"]);
+            check_multiple_arg(sub_m, "sync_commands", &["bar"]);
             // Check the group-pre
-            check_multiple_arg(sub_m, "group_pre", &["m4"]);
-            // Check the group
-            check_multiple_arg(sub_m, "group", &["m1", "m2", "m3", "local", "m6", "m8"]);
+            check_multiple_arg(sub_m, "sync_hosts", &["m4"]);
         } else {
             // Either no run subcommand or one not tested for...
             assert!(false, "Run subcommand not found!");
@@ -160,16 +235,22 @@ mod test {
     }
 
     #[test]
-    fn full_run_subcmd_alt_order_one() -> Fallible<()> {
+    fn full_run_subcmd_alt_order_one() -> MusshResult<()> {
         let app_m = app("").get_matches_from_safe(vec![
-            "mussh", "run", "-h", "all", "!m8", "-s", "-c", "python", "nginx", "tmux",
+            "mussh",
+            "run",
+            "-h",
+            "all,!m8",
+            "--sync",
+            "-c",
+            "python,nginx,tmux",
         ])?;
 
         if let ("run", Some(sub_m)) = app_m.subcommand() {
             // Check the commands
-            check_multiple_arg(sub_m, "commands", &["python", "nginx", "tmux"]);
+            check_multiple_arg(sub_m, "commands", &["python,nginx,tmux"]);
             // Check the hosts
-            check_multiple_arg(sub_m, "hosts", &["all", "!m8"]);
+            check_multiple_arg(sub_m, "hosts", &["all,!m8"]);
             // Check for the presence of sync
             assert!(sub_m.is_present("sync"));
         } else {
@@ -181,16 +262,22 @@ mod test {
     }
 
     #[test]
-    fn full_run_subcmd_alt_order_two() -> Fallible<()> {
+    fn full_run_subcmd_alt_order_two() -> MusshResult<()> {
         let app_m = app("").get_matches_from_safe(vec![
-            "mussh", "run", "-s", "-h", "all", "!m8", "-c", "python", "nginx", "tmux",
+            "mussh",
+            "run",
+            "--sync",
+            "-h",
+            "all,!m8",
+            "-c",
+            "python,nginx,tmux",
         ])?;
 
         if let ("run", Some(sub_m)) = app_m.subcommand() {
             // Check the commands
-            check_multiple_arg(sub_m, "commands", &["python", "nginx", "tmux"]);
+            check_multiple_arg(sub_m, "commands", &["python,nginx,tmux"]);
             // Check the hosts
-            check_multiple_arg(sub_m, "hosts", &["all", "!m8"]);
+            check_multiple_arg(sub_m, "hosts", &["all,!m8"]);
             // Check for the presence of sync
             assert!(sub_m.is_present("sync"));
         } else {
@@ -202,7 +289,7 @@ mod test {
     }
 
     #[test]
-    fn run_subcmd_no_sync() -> Fallible<()> {
+    fn run_subcmd_no_sync() -> MusshResult<()> {
         let app_m = app("").get_matches_from_safe(vec![
             "mussh", "run", "-c", "python", "nginx", "tmux", "-h", "all", "!m8",
         ])?;

@@ -1,56 +1,98 @@
-use failure::{Backtrace, Context, Fail};
-use std::fmt::{self, Display};
+use std::error::Error;
+use std::fmt;
 
+/// A result that includes a `mussh::Error`
+crate type MusshResult<T> = Result<T, MusshErr>;
+
+/// An error thrown by the mussh library
 #[derive(Debug)]
-crate struct MusshError {
-    inner: Context<MusshErrorKind>,
+crate struct MusshErr {
+    /// The kind of error
+    inner: MusshErrKind,
 }
 
-#[derive(Copy, Clone, Eq, PartialEq, Debug, Fail)]
-crate enum MusshErrorKind {
-    // #[fail(display = "The TOML configuration is invalid")]
-    // InvalidConfigToml,
-    #[fail(display = "Failed to establish SSH session")]
-    SshSession,
-    #[fail(display = "Failed to authenticate for SSH session")]
-    SshAuthentication,
-    #[fail(display = "Failed to find a carshell to execute locally")]
-    ShellNotFound,
-}
-
-impl Fail for MusshError {
-    fn cause(&self) -> Option<&dyn Fail> {
-        self.inner.cause()
+impl Error for MusshErr {
+    fn description(&self) -> &str {
+        "Mussh Error"
     }
 
-    fn backtrace(&self) -> Option<&Backtrace> {
-        self.inner.backtrace()
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        Some(&self.inner)
     }
 }
 
-impl Display for MusshError {
+impl fmt::Display for MusshErr {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        Display::fmt(&self.inner, f)
+        write!(f, "{}", self.description())?;
+
+        if let Some(source) = self.source() {
+            write!(f, ": {}", source)?;
+        }
+        write!(f, "")
     }
 }
 
-impl MusshError {
-    #[allow(dead_code)]
-    crate fn kind(&self) -> MusshErrorKind {
-        *self.inner.get_context()
+macro_rules! external_error {
+    ($error:ty, $kind:expr) => {
+        impl From<$error> for MusshErr {
+            fn from(inner: $error) -> Self {
+                Self {
+                    inner: $kind(inner),
+                }
+            }
+        }
+    };
+}
+
+impl From<MusshErrKind> for MusshErr {
+    fn from(inner: MusshErrKind) -> Self {
+        Self { inner }
     }
 }
 
-impl From<MusshErrorKind> for MusshError {
-    fn from(kind: MusshErrorKind) -> Self {
+impl From<&str> for MusshErr {
+    fn from(inner: &str) -> Self {
         Self {
-            inner: Context::new(kind),
+            inner: MusshErrKind::Str(inner.to_string()),
         }
     }
 }
 
-impl From<Context<MusshErrorKind>> for MusshError {
-    fn from(inner: Context<MusshErrorKind>) -> Self {
-        Self { inner: inner }
+external_error!(clap::Error, MusshErrKind::Clap);
+external_error!(std::io::Error, MusshErrKind::Io);
+external_error!(libmussh::Error, MusshErrKind::Libmussh);
+external_error!(String, MusshErrKind::Str);
+
+#[derive(Debug)]
+crate enum MusshErrKind {
+    Clap(clap::Error),
+    Io(std::io::Error),
+    Libmussh(libmussh::Error),
+    Str(String),
+}
+
+impl Error for MusshErrKind {
+    fn description(&self) -> &str {
+        match self {
+            MusshErrKind::Clap(inner) => inner.description(),
+            MusshErrKind::Io(inner) => inner.description(),
+            MusshErrKind::Libmussh(inner) => inner.description(),
+            MusshErrKind::Str(inner) => &inner[..],
+        }
+    }
+
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        match self {
+            MusshErrKind::Clap(inner) => inner.source(),
+            MusshErrKind::Io(inner) => inner.source(),
+            MusshErrKind::Libmussh(inner) => inner.source(),
+            _ => None,
+        }
+    }
+}
+
+impl fmt::Display for MusshErrKind {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.description())
     }
 }
