@@ -1,4 +1,4 @@
-// Copyright (c) 2016, 2018 mussh developers
+// Copyright © 2016 libmussh developers
 //
 // Licensed under the Apache License, Version 2.0
 // <LICENSE-APACHE or http://www.apache.org/licenses/LICENSE-2.0> or the MIT
