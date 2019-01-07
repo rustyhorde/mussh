@@ -8,12 +8,12 @@
 
 //! Runtime
 use crate::error::MusshResult;
-use crate::logging::{FileDrain, Loggers};
-use clap::{App, Arg, SubCommand};
-use libmussh::{Config, Multiplex, RuntimeConfig};
-use slog::{o, trace, Drain, Logger};
+use crate::logging::Loggers;
+use crate::subcmd::{Run, Subcommand};
+use clap::{App, Arg};
+use libmussh::Config;
+use slog::trace;
 use slog_try::try_trace;
-use std::collections::HashMap;
 use std::convert::TryFrom;
 use std::env;
 use std::path::PathBuf;
@@ -59,24 +59,7 @@ crate fn run() -> MusshResult<()> {
         // 'hosts' subcommand
         // ("hosts", Some(sub_m)) => hosts::cmd(&mut config, sub_m),
         // 'run' subcommand
-        ("run", Some(sub_m)) => {
-            let runtime_config = RuntimeConfig::from(sub_m);
-            let sync_hosts = runtime_config.sync_hosts();
-            let multiplex_map = config.to_host_map(&runtime_config);
-            let mut cmd_loggers_map = HashMap::new();
-            for host in multiplex_map.keys() {
-                let _ = cmd_loggers_map
-                    .entry(host.clone())
-                    .or_insert_with(|| host_file_logger(&stdout, host));
-            }
-            let mut multiplex = Multiplex::default();
-            let _ = multiplex.set_stdout(stdout);
-            let _ = multiplex.set_stderr(stderr);
-            let _ = multiplex.set_host_loggers(cmd_loggers_map);
-            multiplex
-                .multiplex(sync_hosts, multiplex_map)
-                .map_err(|e| e.into())
-        }
+        ("run", Some(sub_m)) => Run::new(stdout, stderr).execute(&config, sub_m),
         (cmd, _) => Err(format!("Unknown subcommand {}", cmd).into()),
     }
 }
@@ -113,79 +96,7 @@ fn app<'a, 'b>(default_config_path: &'a str) -> App<'a, 'b> {
                 .long("output")
                 .help("Show the TOML configuration"),
         )
-        .subcommand(subcommand())
-}
-
-fn subcommand<'a, 'b>() -> App<'a, 'b> {
-    SubCommand::with_name("run")
-        .about("Run a command on hosts")
-        .arg(Arg::with_name("dry_run").long("dryrun").help(
-            "Parse config and setup the client, \
-             but don't run it.",
-        ))
-        .arg(
-            Arg::with_name("hosts")
-                .short("h")
-                .long("hosts")
-                .value_name("HOSTS")
-                .help("The hosts to multiplex the command over")
-                .multiple(true)
-                .use_delimiter(true),
-        )
-        .arg(
-            Arg::with_name("commands")
-                .short("c")
-                .long("commands")
-                .value_name("CMD")
-                .help("The commands to multiplex")
-                .multiple(true)
-                .requires("hosts")
-                .use_delimiter(true),
-        )
-        .arg(
-            Arg::with_name("sync_hosts")
-                .short("s")
-                .long("sync_hosts")
-                .value_name("HOSTS")
-                .help("The hosts to run the sync commands on before running on any other hosts")
-                .use_delimiter(true)
-                .required_unless("hosts")
-                .requires("sync_commands"),
-        )
-        .arg(
-            Arg::with_name("sync_commands")
-                .short("y")
-                .long("sync_commands")
-                .value_name("CMD")
-                .help("The commands to run on the sync hosts before running on any other hosts")
-                .use_delimiter(true),
-        )
-        .arg(Arg::with_name("sync").long("sync").help(
-            "Run the given commadn synchronously across the \
-             hosts.",
-        ))
-}
-
-fn host_file_logger(stdout: &Option<Logger>, hostname: &str) -> Option<Logger> {
-    let mut host_file_path = if let Some(mut config_dir) = dirs::config_dir() {
-        config_dir.push(env!("CARGO_PKG_NAME"));
-        config_dir
-    } else {
-        PathBuf::new()
-    };
-
-    host_file_path.push(hostname);
-    let _ = host_file_path.set_extension("log");
-
-    try_trace!(stdout, "Log Path: {}", host_file_path.display());
-
-    if let Ok(file_drain) = FileDrain::try_from(host_file_path) {
-        let async_file_drain = slog_async::Async::new(file_drain).build().fuse();
-        let file_logger = Logger::root(async_file_drain, o!());
-        Some(file_logger)
-    } else {
-        None
-    }
+        .subcommand(Run::subcommand())
 }
 
 #[cfg(test)]

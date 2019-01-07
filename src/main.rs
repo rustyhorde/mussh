@@ -45,6 +45,7 @@
 mod error;
 mod logging;
 mod run;
+mod subcmd;
 
 use clap::ErrorKind;
 use std::error::Error;
