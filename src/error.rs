@@ -71,12 +71,14 @@ external_error!(clap::Error, MusshErrKind::Clap);
 external_error!(std::io::Error, MusshErrKind::Io);
 external_error!(libmussh::Error, MusshErrKind::Libmussh);
 external_error!(String, MusshErrKind::Str);
+external_error!(rusqlite::Error, MusshErrKind::Rusqlite);
 
 #[derive(Debug)]
 crate enum MusshErrKind {
     Clap(clap::Error),
     Io(std::io::Error),
     Libmussh(libmussh::Error),
+    Rusqlite(rusqlite::Error),
     Str(String),
 }
 
@@ -86,6 +88,7 @@ impl Error for MusshErrKind {
             MusshErrKind::Clap(inner) => inner.description(),
             MusshErrKind::Io(inner) => inner.description(),
             MusshErrKind::Libmussh(inner) => inner.description(),
+            MusshErrKind::Rusqlite(inner) => inner.description(),
             MusshErrKind::Str(inner) => &inner[..],
         }
     }
@@ -95,6 +98,7 @@ impl Error for MusshErrKind {
             MusshErrKind::Clap(inner) => inner.source(),
             MusshErrKind::Io(inner) => inner.source(),
             MusshErrKind::Libmussh(inner) => inner.source(),
+            MusshErrKind::Rusqlite(inner) => inner.source(),
             _ => None,
         }
     }

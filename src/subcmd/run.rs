@@ -12,6 +12,7 @@ use crate::logging::FileDrain;
 use crate::subcmd::Subcommand;
 use clap::{App, Arg, ArgMatches, SubCommand};
 use libmussh::{Config, Multiplex, RuntimeConfig};
+use rusqlite::Connection;
 use slog::{o, trace, Drain, Logger};
 use slog_try::try_trace;
 use std::collections::HashMap;
@@ -22,11 +23,16 @@ use std::path::PathBuf;
 crate struct Run {
     stdout: Option<Logger>,
     stderr: Option<Logger>,
+    db_path: PathBuf,
 }
 
 impl Run {
-    crate fn new(stdout: Option<Logger>, stderr: Option<Logger>) -> Self {
-        Self { stdout, stderr }
+    crate fn new(stdout: Option<Logger>, stderr: Option<Logger>, db_path: PathBuf) -> Self {
+        Self {
+            stdout,
+            stderr,
+            db_path,
+        }
     }
 }
 
@@ -85,6 +91,8 @@ impl Subcommand for Run {
         let runtime_config = RuntimeConfig::from(matches);
         let sync_hosts = runtime_config.sync_hosts();
         let multiplex_map = config.to_host_map(&runtime_config);
+        let mut _conn = Connection::open(&self.db_path)?;
+
         let mut cmd_loggers_map = HashMap::new();
         for host in multiplex_map.keys() {
             let _ = cmd_loggers_map
@@ -95,9 +103,21 @@ impl Subcommand for Run {
         let _ = multiplex.set_stdout(self.stdout.clone());
         let _ = multiplex.set_stderr(self.stderr.clone());
         let _ = multiplex.set_host_loggers(cmd_loggers_map);
-        multiplex
-            .multiplex(sync_hosts, multiplex_map)
-            .map_err(|e| e.into())
+        for result in multiplex.multiplex(sync_hosts, multiplex_map) {
+            if let Ok(metrics) = result {
+                let secs = metrics.duration().as_secs();
+                let ms = metrics.duration().subsec_millis();
+                println!(
+                    "'{}' run on '{}' in {}.{}",
+                    metrics.cmd_name(),
+                    metrics.hostname(),
+                    secs,
+                    ms
+                );
+            }
+        }
+
+        Ok(())
     }
 }
 

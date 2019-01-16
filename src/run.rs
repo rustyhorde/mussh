@@ -19,6 +19,7 @@ use std::env;
 use std::path::PathBuf;
 
 crate const MUSSH_CONFIG_FILE_NAME: &str = "mussh.toml";
+crate const MUSSH_DB_FILE_NAME: &str = "mussh.db";
 
 fn base_config_dir() -> MusshResult<PathBuf> {
     Ok(if let Some(config_dir) = dirs::config_dir() {
@@ -46,6 +47,9 @@ crate fn run() -> MusshResult<()> {
     try_trace!(stdout, "Config Path: {}", config_path.display());
     let config = Config::try_from(config_path)?;
 
+    let db_path =
+        PathBuf::from(matches.value_of("config").unwrap_or_else(|| "./")).join(MUSSH_DB_FILE_NAME);
+
     if matches.is_present("output") {
         try_trace!(stdout, "{:?}", config);
     }
@@ -59,7 +63,7 @@ crate fn run() -> MusshResult<()> {
         // 'hosts' subcommand
         // ("hosts", Some(sub_m)) => hosts::cmd(&mut config, sub_m),
         // 'run' subcommand
-        ("run", Some(sub_m)) => Run::new(stdout, stderr).execute(&config, sub_m),
+        ("run", Some(sub_m)) => Run::new(stdout, stderr, db_path).execute(&config, sub_m),
         (cmd, _) => Err(format!("Unknown subcommand {}", cmd).into()),
     }
 }
