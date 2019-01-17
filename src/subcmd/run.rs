@@ -12,7 +12,7 @@ use crate::logging::FileDrain;
 use crate::subcmd::Subcommand;
 use clap::{App, Arg, ArgMatches, SubCommand};
 use libmussh::{Config, Multiplex, RuntimeConfig};
-use rusqlite::Connection;
+use rusqlite::{Connection, NO_PARAMS};
 use slog::{o, trace, Drain, Logger};
 use slog_try::try_trace;
 use std::collections::HashMap;
@@ -91,7 +91,8 @@ impl Subcommand for Run {
         let runtime_config = RuntimeConfig::from(matches);
         let sync_hosts = runtime_config.sync_hosts();
         let multiplex_map = config.to_host_map(&runtime_config);
-        let mut _conn = Connection::open(&self.db_path)?;
+        let conn = Connection::open(&self.db_path)?;
+        create_metrics_table(&conn)?;
 
         let mut cmd_loggers_map = HashMap::new();
         for host in multiplex_map.keys() {
@@ -119,6 +120,21 @@ impl Subcommand for Run {
 
         Ok(())
     }
+}
+
+fn create_metrics_table(conn: &Connection) -> MusshResult<()> {
+    let _rows_changed = conn.execute(
+        "CREATE TABLE IF NOT EXISTS metrics (
+          id         INTEGER PRIMARY KEY,
+          hostname   TEXT NOT NULL,
+          cmdname    TEXT NOT NULL,
+          secs       INTEGER NOT NULL,
+          micros     INTEGER NOT NULL,
+          timestamp  INTEGER NOT NULL
+        )",
+        NO_PARAMS,
+    )?;
+    Ok(())
 }
 
 fn host_file_logger(stdout: &Option<Logger>, hostname: &str) -> Option<Logger> {
