@@ -53,7 +53,7 @@ impl<'a> TryFrom<&'a ArgMatches<'a>> for Loggers {
             0 => Level::Warning,
             1 => Level::Info,
             2 => Level::Debug,
-            3 | _ => Level::Trace,
+            _ => Level::Trace,
         };
 
         let stdout_decorator = TermDecorator::new().stdout().build();

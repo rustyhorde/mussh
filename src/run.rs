@@ -116,7 +116,7 @@ mod test {
             let values_vec: Vec<_> = values.collect();
             assert_eq!(values_vec, expected);
         } else {
-            assert!(false, "no values found!");
+            panic!("no values found!");
         }
     }
 
@@ -154,7 +154,7 @@ mod test {
             check_multiple_arg(sub_m, "sync_hosts", &["m4"]);
         } else {
             // Either no run subcommand or one not tested for...
-            assert!(false, "Run subcommand not found!");
+            panic!("Run subcommand not found!");
         }
 
         Ok(())
@@ -181,7 +181,7 @@ mod test {
             assert!(sub_m.is_present("sync"));
         } else {
             // Either no run subcommand or one not tested for...
-            assert!(false, "Run subcommand not found!");
+            panic!("Run subcommand not found!");
         }
 
         Ok(())
@@ -208,7 +208,7 @@ mod test {
             assert!(sub_m.is_present("sync"));
         } else {
             // Either no run subcommand or one not tested for...
-            assert!(false, "Run subcommand not found!");
+            panic!("Run subcommand not found!");
         }
 
         Ok(())
@@ -234,7 +234,7 @@ mod test {
             assert!(!sub_m.is_present("sync"));
         } else {
             // Either no run subcommand or one not tested for...
-            assert!(false, "Run subcommand not found!");
+            panic!("Run subcommand not found!");
         }
 
         Ok(())

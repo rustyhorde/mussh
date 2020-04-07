@@ -32,12 +32,16 @@ impl Error for MusshErr {
 
 impl fmt::Display for MusshErr {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.description())?;
+        let err: &(dyn Error) = self;
+        let mut iter = err.chain();
+        let _skip_me = iter.next();
+        write!(f, "{}", self.inner)?;
 
-        if let Some(source) = self.source() {
-            write!(f, ": {}", source)?;
+        for e in iter {
+            writeln!(f)?;
+            write!(f, "{}", e)?;
         }
-        write!(f, "")
+        Ok(())
     }
 }
 
@@ -83,16 +87,6 @@ crate enum MusshErrKind {
 }
 
 impl Error for MusshErrKind {
-    fn description(&self) -> &str {
-        match self {
-            MusshErrKind::Clap(inner) => inner.description(),
-            MusshErrKind::Io(inner) => inner.description(),
-            MusshErrKind::Libmussh(inner) => inner.description(),
-            MusshErrKind::Rusqlite(inner) => inner.description(),
-            MusshErrKind::Str(inner) => &inner[..],
-        }
-    }
-
     fn source(&self) -> Option<&(dyn Error + 'static)> {
         match self {
             MusshErrKind::Clap(inner) => inner.source(),
@@ -106,6 +100,6 @@ impl Error for MusshErrKind {
 
 impl fmt::Display for MusshErrKind {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.description())
+        write!(f, "{}", self)
     }
 }
