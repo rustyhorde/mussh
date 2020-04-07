@@ -97,39 +97,45 @@ mod logging;
 mod run;
 mod subcmd;
 
+use crate::error::{MusshErr, MusshErrKind};
 use clap::ErrorKind;
 use std::error::Error;
 use std::process;
 
 /// mussh entry point
 fn main() {
-    match run::run() {
-        Ok(_) => process::exit(0),
-        Err(error) => {
-            if let Some(cause) = error.source() {
-                if let Some(err) = cause.downcast_ref::<clap::Error>() {
-                    let kind = err.kind;
-                    eprintln!("{}", err.message);
-                    match kind {
-                        ErrorKind::HelpDisplayed | ErrorKind::VersionDisplayed => process::exit(0),
-                        _ => process::exit(1),
-                    }
-                } else {
-                    eprintln!("{}", error);
-
-                    if let Some(cause) = error.source() {
-                        eprintln!(": {}", cause);
-                    }
-                    process::exit(1);
-                }
-            } else {
+    process::exit(match run::run() {
+        Ok(_) => 0,
+        Err(error) => error.source().and_then(is_lib_error).map_or_else(
+            || {
                 eprintln!("{}", error);
+                1
+            },
+            |e| is_clap_help_or_version((&error, e)),
+        ),
+    })
+}
 
-                if let Some(cause) = error.source() {
-                    eprintln!(": {}", cause);
-                }
-                process::exit(1);
+fn is_lib_error<'a>(error: &'a (dyn Error + 'static)) -> Option<&'a MusshErrKind> {
+    error.downcast_ref::<MusshErrKind>()
+}
+
+fn is_clap_help_or_version(error_tuple: (&MusshErr, &MusshErrKind)) -> i32 {
+    let (error, k_error) = error_tuple;
+    let disp_err = || {
+        eprintln!("{}", error);
+        1
+    };
+
+    match k_error {
+        MusshErrKind::Clap(e) => match e.kind {
+            ErrorKind::HelpDisplayed => {
+                eprintln!("{}", e.message);
+                0
             }
-        }
+            ErrorKind::VersionDisplayed => 0,
+            _ => disp_err(),
+        },
+        _ => disp_err(),
     }
 }
