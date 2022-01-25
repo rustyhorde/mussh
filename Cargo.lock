@@ -279,9 +279,9 @@ checksum = "a374c89b9db55895453a74c1e38861d9deec0b01b405a82516e9d5de4820dea1"
 
 [[package]]
 name = "libc"
-version = "0.2.113"
+version = "0.2.114"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "eef78b64d87775463c549fbd80e19249ef436ea3bf1de2a1eb7e717ec7fab1e9"
+checksum = "b0005d08a8f7b65fb8073cb697aa0b12b631ed251ce73d862ce50eeb52ce3b50"
 
 [[package]]
 name = "libmussh"
