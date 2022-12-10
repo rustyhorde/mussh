@@ -12,14 +12,13 @@ use crate::logging::Loggers;
 use crate::subcmd::{Run, Subcommand};
 use clap::{App, Arg};
 use libmussh::Config;
-use slog::trace;
 use slog_try::try_trace;
 use std::convert::TryFrom;
 use std::env;
 use std::path::PathBuf;
 
-crate const MUSSH_CONFIG_FILE_NAME: &str = "mussh.toml";
-crate const MUSSH_DB_FILE_NAME: &str = "mussh.db";
+pub(crate) const MUSSH_CONFIG_FILE_NAME: &str = "mussh.toml";
+pub(crate) const MUSSH_DB_FILE_NAME: &str = "mussh.db";
 
 fn base_config_dir() -> MusshResult<PathBuf> {
     Ok(if let Some(config_dir) = dirs::config_dir() {
@@ -32,7 +31,7 @@ fn base_config_dir() -> MusshResult<PathBuf> {
     .join(env!("CARGO_PKG_NAME")))
 }
 
-crate fn run() -> MusshResult<()> {
+pub(crate) fn run() -> MusshResult<()> {
     // Setup the default config path for use in clap App
     let base_path = base_config_dir()?;
     let base_path_str = format!("{}", base_path.display());
@@ -42,13 +41,13 @@ crate fn run() -> MusshResult<()> {
     let (stdout, stderr) = Loggers::try_from(&matches)?.split();
 
     // Grab the mussh config
-    let config_path = PathBuf::from(matches.value_of("config").unwrap_or_else(|| "./"))
-        .join(MUSSH_CONFIG_FILE_NAME);
+    let config_path =
+        PathBuf::from(matches.value_of("config").unwrap_or("./")).join(MUSSH_CONFIG_FILE_NAME);
     try_trace!(stdout, "Config Path: {}", config_path.display());
     let config = Config::try_from(config_path)?;
 
     let db_path =
-        PathBuf::from(matches.value_of("config").unwrap_or_else(|| "./")).join(MUSSH_DB_FILE_NAME);
+        PathBuf::from(matches.value_of("config").unwrap_or("./")).join(MUSSH_DB_FILE_NAME);
 
     if matches.is_present("output") {
         try_trace!(stdout, "{:?}", config);
@@ -64,11 +63,11 @@ crate fn run() -> MusshResult<()> {
         // ("hosts", Some(sub_m)) => hosts::cmd(&mut config, sub_m),
         // 'run' subcommand
         ("run", Some(sub_m)) => Run::new(stdout, stderr, db_path).execute(&config, sub_m),
-        (cmd, _) => Err(format!("Unknown subcommand {}", cmd).into()),
+        (cmd, _) => Err(format!("Unknown subcommand {cmd}").into()),
     }
 }
 
-fn app<'a, 'b>(default_config_path: &'a str) -> App<'a, 'b> {
+fn app<'b>(default_config_path: &'_ str) -> App<'_, 'b> {
     App::new(env!("CARGO_PKG_NAME"))
         .version(env!("CARGO_PKG_VERSION"))
         .author("Jason Ozias <jason.g.ozias@gmail.com>")

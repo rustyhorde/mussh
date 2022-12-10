@@ -12,22 +12,22 @@ use crate::logging::FileDrain;
 use crate::subcmd::Subcommand;
 use clap::{App, Arg, ArgMatches, SubCommand};
 use libmussh::{Config, Multiplex, RuntimeConfig};
-use rusqlite::{Connection, NO_PARAMS};
-use slog::{o, trace, Drain, Logger};
+use rusqlite::Connection;
+use slog::{o, Drain, Logger};
 use slog_try::try_trace;
 use std::collections::HashMap;
 use std::convert::TryFrom;
 use std::path::PathBuf;
 
 #[derive(Clone, Default)]
-crate struct Run {
+pub(crate) struct Run {
     stdout: Option<Logger>,
     stderr: Option<Logger>,
     db_path: PathBuf,
 }
 
 impl Run {
-    crate fn new(stdout: Option<Logger>, stderr: Option<Logger>, db_path: PathBuf) -> Self {
+    pub(crate) fn new(stdout: Option<Logger>, stderr: Option<Logger>, db_path: PathBuf) -> Self {
         Self {
             stdout,
             stderr,
@@ -104,18 +104,20 @@ impl Subcommand for Run {
         let _ = multiplex.set_stdout(self.stdout.clone());
         let _ = multiplex.set_stderr(self.stderr.clone());
         let _ = multiplex.set_host_loggers(cmd_loggers_map);
-        for result in multiplex.multiplex(sync_hosts, multiplex_map) {
-            if let Ok(metrics) = result {
-                let secs = metrics.duration().as_secs();
-                let ms = metrics.duration().subsec_millis();
-                println!(
-                    "'{}' run on '{}' in {}.{}",
-                    metrics.cmd_name(),
-                    metrics.hostname(),
-                    secs,
-                    ms
-                );
-            }
+        for metrics in multiplex
+            .multiplex(sync_hosts, multiplex_map)
+            .into_iter()
+            .flatten()
+        {
+            let secs = metrics.duration().as_secs();
+            let ms = metrics.duration().subsec_millis();
+            println!(
+                "'{}' run on '{}' in {}.{}",
+                metrics.cmd_name(),
+                metrics.hostname(),
+                secs,
+                ms
+            );
         }
 
         Ok(())
@@ -132,7 +134,7 @@ fn create_metrics_table(conn: &Connection) -> MusshResult<()> {
           micros     INTEGER NOT NULL,
           timestamp  INTEGER NOT NULL
         )",
-        NO_PARAMS,
+        [],
     )?;
     Ok(())
 }

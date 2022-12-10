@@ -13,9 +13,9 @@ use libmussh::Config;
 
 mod run;
 
-crate use self::run::Run;
+pub(crate) use self::run::Run;
 
-crate trait Subcommand {
+pub(crate) trait Subcommand {
     fn subcommand<'a, 'b>() -> App<'a, 'b>;
     fn execute(&self, config: &Config, matches: &ArgMatches<'_>) -> MusshResult<()>;
 }

@@ -12,16 +12,16 @@ repository = "https://github.com/rustyhorde/mussh"
 version = "3.1.2"
 
 [dependencies]
-chrono = "0"
-clap = "2"
-dirs = "1"
-getset = "0"
-libmussh = "1"
-rusqlite = "0"
-slog-async = "2"
-slog-term = "2"
-slog-try = "0"
+chrono = "0.4.23"
+clap = "2.34.0"
+dirs = "1.0.5"
+getset = "0.1.2"
+libmussh = "1.1.4"
+rusqlite = "0.28.0"
+slog = { version = "2.7.0", features = ["max_level_trace", "release_max_level_trace"] }
+slog-async = "2.7.0"
+slog-term = "2.9.0"
+slog-try = "1.0.1"
 
-[dependencies.slog]
-features = ["max_level_trace", "release_max_level_trace"]
-version = "2"
+[build-dependencies]
+rustversion = "1.0.9"

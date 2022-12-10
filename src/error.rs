@@ -11,11 +11,11 @@ use std::error::Error;
 use std::fmt;
 
 /// A result that includes a `mussh::Error`
-crate type MusshResult<T> = Result<T, MusshErr>;
+pub(crate) type MusshResult<T> = Result<T, MusshErr>;
 
 /// An error thrown by the mussh library
 #[derive(Debug)]
-crate struct MusshErr {
+pub(crate) struct MusshErr {
     /// The kind of error
     inner: MusshErrKind,
 }
@@ -32,16 +32,7 @@ impl Error for MusshErr {
 
 impl fmt::Display for MusshErr {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let err: &(dyn Error) = self;
-        let mut iter = err.chain();
-        let _skip_me = iter.next();
-        write!(f, "{}", self.inner)?;
-
-        for e in iter {
-            writeln!(f)?;
-            write!(f, "{}", e)?;
-        }
-        Ok(())
+        write!(f, "{}", self.inner)
     }
 }
 
@@ -78,7 +69,7 @@ external_error!(String, MusshErrKind::Str);
 external_error!(rusqlite::Error, MusshErrKind::Rusqlite);
 
 #[derive(Debug)]
-crate enum MusshErrKind {
+pub(crate) enum MusshErrKind {
     Clap(clap::Error),
     Io(std::io::Error),
     Libmussh(libmussh::Error),
@@ -93,13 +84,19 @@ impl Error for MusshErrKind {
             MusshErrKind::Io(inner) => inner.source(),
             MusshErrKind::Libmussh(inner) => inner.source(),
             MusshErrKind::Rusqlite(inner) => inner.source(),
-            _ => None,
+            MusshErrKind::Str(_inner) => None,
         }
     }
 }
 
 impl fmt::Display for MusshErrKind {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self)
+        match self {
+            MusshErrKind::Str(inner) => write!(f, "{inner}"),
+            MusshErrKind::Clap(inner) => write!(f, "{inner}"),
+            MusshErrKind::Io(inner) => write!(f, "{inner}"),
+            MusshErrKind::Libmussh(inner) => write!(f, "{inner}"),
+            MusshErrKind::Rusqlite(inner) => write!(f, "{inner}"),
+        }
     }
 }

@@ -20,7 +20,7 @@ use std::io::Write;
 use std::path::PathBuf;
 
 /// A struct that supports slog logging
-crate trait Slogger {
+pub(crate) trait Slogger {
     /// Add an optional stdout `slog` logger to the struct.
     fn set_stdout(self, stdout: Option<Logger>) -> Self;
     /// Add an optional stderr `slog` logger to the struct.
@@ -29,7 +29,7 @@ crate trait Slogger {
 
 /// `slog` loggers for stdout/stderr.
 #[derive(Clone, Debug, Default, Getters)]
-crate struct Loggers {
+pub(crate) struct Loggers {
     /// An optional stdout logger.
     #[get = "pub"]
     stdout: Option<Logger>,
@@ -40,7 +40,7 @@ crate struct Loggers {
 
 impl Loggers {
     /// Split this `Loggers` into the stdout and stderr components.
-    crate fn split(&self) -> (Option<Logger>, Option<Logger>) {
+    pub(crate) fn split(&self) -> (Option<Logger>, Option<Logger>) {
         (self.stdout.clone(), self.stderr.clone())
     }
 }
@@ -79,7 +79,7 @@ impl<'a> TryFrom<&'a ArgMatches<'a>> for Loggers {
 /// A `slog` drain that writes to a file.
 #[derive(Debug)]
 #[allow(dead_code)]
-crate struct FileDrain {
+pub(crate) struct FileDrain {
     /// The file to drain log records to.
     file: File,
 }
