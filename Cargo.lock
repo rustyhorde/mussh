@@ -739,9 +739,9 @@ dependencies = [
 
 [[package]]
 name = "slog-try"
-version = "1.0.1"
+version = "1.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b1eb06e6cc1ba80963dc3eeef40dec5da476b398a418ee56be8e588a69964f5c"
+checksum = "e2f17f0034ceef180e86a922bc676f88806a7ea6f4718c6280977b1eab67af9b"
 dependencies = [
  "rustversion",
  "slog",
